@@ -66,4 +66,5 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
 
+
 }

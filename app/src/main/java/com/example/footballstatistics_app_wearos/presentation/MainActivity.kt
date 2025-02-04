@@ -97,7 +97,7 @@ inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(navControll
     return viewModel(parentEntry)
 }
 
-
+/*
 val healthClient = HealthServices.getClient(this /*context*/)
 val exerciseClient = healthClient.exerciseClient
 lifecycleScope.launch {
@@ -107,4 +107,4 @@ lifecycleScope.launch {
             capabilities.getExerciseTypeCapabilities(ExerciseType.RUNNING)
     }
 }
-
+*/
