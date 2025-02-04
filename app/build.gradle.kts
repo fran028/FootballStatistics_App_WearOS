@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.core.splashscreen)
     implementation(libs.material3.windowsize)
     implementation(libs.compose.material3)
+    implementation(libs.ui.text.google.fonts)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)
