@@ -1,11 +1,7 @@
-/* While this template provides a good starting point for using Wear Compose, you can always
- * take a look at https://github.com/android/wear-os-samples/tree/main/ComposeStarter to find the
- * most up to date changes to the libraries and their usages.
- */
-
 package com.example.footballstatistics_app_wearos.presentation
 
 import android.os.Bundle
+import android.view.Menu
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -14,17 +10,39 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.health.services.client.HealthServices
+import androidx.health.services.client.data.ExerciseType
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
+import androidx.navigation.NavHost
+import androidx.navigation.navigation
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
+import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.TimeText
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.navigation.SwipeDismissableNavHost
+import androidx.wear.compose.navigation.composable
+import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.footballstatistics_app_wearos.R
+import com.example.footballstatistics_app_wearos.presentation.pages.ActivityCalibratePage
+import com.example.footballstatistics_app_wearos.presentation.pages.ActivityResultPage
+import com.example.footballstatistics_app_wearos.presentation.pages.ActivitySetUpPage
+import com.example.footballstatistics_app_wearos.presentation.pages.ActivityTrackerPage
+import com.example.footballstatistics_app_wearos.presentation.pages.MenuPage
 import com.example.footballstatistics_app_wearos.presentation.theme.FootballStatistics_App_WearOSTheme
+import kotlinx.serialization.Serializable
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,38 +53,58 @@ class MainActivity : ComponentActivity() {
         setTheme(android.R.style.Theme_DeviceDefault)
 
         setContent {
-            WearApp("Messi")
+
+            val navController = rememberSwipeDismissableNavController()
+            SwipeDismissableNavHost(
+                navController = navController,
+                startDestination = "Menu"
+            ) {
+                composable("Menu"){
+                    MenuPage(navController = navController)
+                }
+                navigation(
+                    startDestination = "Activity_SetUp",
+                    route = "Activity"
+                ){
+                    composable("Activity_SetUp"){
+                        ActivitySetUpPage(navController = navController)
+                    }
+                    composable("Activity_Calibrate/{location}"){
+                        val location = it.arguments?.getString("location")
+                        ActivityCalibratePage(navController = navController, location = location.toString())
+                    }
+                    composable("Activity_Tracker"){
+                        ActivityTrackerPage(navController = navController)
+                    }
+                }
+                composable("Activity_Result"){
+                    ActivityResultPage(navController = navController)
+                }
+            }
         }
     }
 }
 
+
+
+
 @Composable
-fun WearApp(greetingName: String) {
-    FootballStatistics_App_WearOSTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colors.background),
-            contentAlignment = Alignment.Center
-        ) {
-            TimeText()
-            Greeting(greetingName = greetingName)
-        }
+inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(navController: NavController) : T{
+    val navGraphRoute = destination.parent?.route ?: return viewModel()
+    val parentEntry = remember(this){
+        navController.getBackStackEntry(navGraphRoute)
+    }
+    return viewModel(parentEntry)
+}
+
+
+val healthClient = HealthServices.getClient(this /*context*/)
+val exerciseClient = healthClient.exerciseClient
+lifecycleScope.launch {
+    val capabilities = exerciseClient.getCapabilitiesAsync().await()
+    if (ExerciseType.RUNNING in capabilities.supportedExerciseTypes) {
+        val runningCapabilities =
+            capabilities.getExerciseTypeCapabilities(ExerciseType.RUNNING)
     }
 }
 
-@Composable
-fun Greeting(greetingName: String) {
-    Text(
-        modifier = Modifier.fillMaxWidth(),
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colors.primary,
-        text = stringResource(R.string.hello_world, greetingName)
-    )
-}
-
-@Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
-@Composable
-fun DefaultPreview() {
-    WearApp("Preview Android")
-}
