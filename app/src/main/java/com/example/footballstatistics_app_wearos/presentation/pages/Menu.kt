@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentDataType.Companion.Date
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -24,6 +25,7 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
+import com.example.footballstatistics_app_wearos.presentation.Match
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
 import com.example.footballstatistics_app_wearos.presentation.green
@@ -38,10 +40,38 @@ import com.google.android.horologist.compose.layout.rememberResponsiveColumnStat
 import com.google.android.horologist.compose.material.Chip
 import com.google.android.horologist.compose.material.ListHeaderDefaults.firstItemPadding
 import com.google.android.horologist.compose.material.ResponsiveListHeader
+import java.util.Date
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
 fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
+
+    /*val match1 = Match(
+        date = Date(),
+        start_time = Time,
+        end_time = TODO(),
+        total_time = TODO(),
+        match_id = TODO(),
+        away_corner_location = TODO(),
+        home_corner_location = TODO(),
+        kickoff_location = TODO(),
+        start_location = TODO(),
+        matchStatus = TODO(),
+        activityData = TODO(),
+
+
+        /*val start_time: String,
+        val end_time: String,
+        var total_time: String,
+        val match_id: String,
+        var away_corner_location: String,
+        var home_corner_location: String,
+        var kickoff_location: String,
+        val start_location: String,
+        var matchStatus: String = "Not Started",
+
+        val activityData: String*/
+    )*/
 
     val columnState = rememberResponsiveColumnState(
         contentPadding = ScalingLazyColumnDefaults.padding(
@@ -69,7 +99,9 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
         item {
             ChipButton(
                 text = "Start Match",
-                onClick = { navController.navigate("Activity") },
+                onClick = {
+
+                    navController.navigate("Activity") },
                 color = green,
                 icon = R.drawable.soccer,
                 navController =  navController

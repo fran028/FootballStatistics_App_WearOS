@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.ChipDefaults.chipColors
@@ -52,6 +58,9 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
             last = ScalingLazyColumnDefaults.ItemType.Chip
         )
     )
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showUploadDialog by remember { mutableStateOf(false) }
 
     val iniTime = "00:00"
     val endTime = "00:00"
@@ -89,18 +98,21 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
         item{
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Match Result ",
+                    text = timer,
                     fontFamily = LeagueGothic,
                     color = white,
-                    fontSize = 32.sp
+                    fontSize = 40.sp
                 )
                 Text(
-                    text = "$iniTime - $endTime",
+                    text = "Activity Time",
                     fontFamily = LeagueGothic,
                     color = gray,
                     fontSize = 16.sp,
                 )
             }
+        }
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
         }
         item {
             ChipButton(
@@ -114,11 +126,100 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
         item {
             ChipButton(
                 text = "Delete Match",
-                onClick = {navController.navigate("Menu")},
+                onClick = { showDeleteDialog = true },
                 color = red,
                 icon = R.drawable.trash,
                 navController =  navController
             )
         }
+        item {
+            ChipButton(
+                text = "Back to Menu",
+                onClick = { navController.navigate("Menu") },
+                color = yellow,
+                icon = R.drawable.left,
+                navController =  navController
+            )
+        }
+    }
+    if(showDeleteDialog){
+        Dialog(
+            onDismissRequest = { showDeleteDialog = false },
+            content = {
+                ScalingLazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(black)
+                        .padding(5.dp),
+                    columnState = columnState
+                ) {
+                    item {
+                        ChipButton(
+                            text = "Delete",
+                            onClick = {
+                                navController.navigate("Menu")
+                                showDeleteDialog = false
+                            },
+                            color = red,
+                            icon = R.drawable.trash,
+                            navController = navController
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.size(8.dp))
+                    }
+                    item {
+                        ChipButton(
+                            text = "Cancel",
+                            onClick = { showDeleteDialog = false },
+                            color = yellow,
+                            icon = R.drawable.left,
+                            navController = navController
+                        )
+                    }
+                }
+
+            }
+        )
+    }
+    if(showUploadDialog){
+        Dialog(
+            onDismissRequest = { showUploadDialog = false },
+            content = {
+                ScalingLazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(black)
+                        .padding(5.dp),
+                    columnState = columnState
+                ) {
+                    item {
+                        ChipButton(
+                            text = "Delete",
+                            onClick = {
+                                navController.navigate("Menu")
+                                showUploadDialog = false
+                            },
+                            color = red,
+                            icon = R.drawable.trash,
+                            navController = navController
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.size(8.dp))
+                    }
+                    item {
+                        ChipButton(
+                            text = "Cancel",
+                            onClick = { showUploadDialog = false },
+                            color = yellow,
+                            icon = R.drawable.left,
+                            navController = navController
+                        )
+                    }
+                }
+
+            }
+        )
     }
 }

@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.material3.windowsize)
     implementation(libs.compose.material3)
     implementation(libs.ui.text.google.fonts)
+    implementation(libs.material3.android)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)
@@ -66,6 +67,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
 
 }
