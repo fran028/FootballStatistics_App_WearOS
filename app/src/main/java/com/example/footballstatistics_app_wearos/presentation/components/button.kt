@@ -29,6 +29,7 @@ import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.black
+import com.example.footballstatistics_app_wearos.presentation.gray
 import com.example.footballstatistics_app_wearos.presentation.red
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.white
@@ -37,14 +38,21 @@ import com.google.android.horologist.compose.material.Chip
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
-fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navController: NavController, filled: Boolean = false){
+fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navController: NavController, filled: Boolean = false, disabled: Boolean = false){
 
     var bgcolor = black
     var fontColor = white
+    var borderColor = color
 
     if(filled){
         bgcolor = color
         fontColor = black
+    }
+
+    if(disabled){
+        bgcolor = black
+        fontColor = gray
+        borderColor = gray
     }
 
     Chip(
@@ -57,6 +65,7 @@ fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navCo
             )
         },
         onClick =  onClick ,
+        enabled = !disabled,
         colors = chipColors(backgroundColor = bgcolor, contentColor = fontColor),
         shape = RoundedCornerShape(25.dp),
         modifier = Modifier
@@ -64,7 +73,7 @@ fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navCo
             .height(40.dp)
             .border(
                 width = 2.dp,
-                color = color,
+                color = borderColor,
                 shape = RoundedCornerShape(25.dp)
             ) ,
         icon = {
@@ -72,7 +81,7 @@ fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navCo
                 modifier = Modifier
                     .height(40.dp)
                     .width(40.dp)
-                    .background(color, CircleShape)
+                    .background(borderColor, CircleShape)
                     .padding(end = 0.dp),
                 contentAlignment = Alignment.Center) {
                 Image(
@@ -82,6 +91,6 @@ fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navCo
                 )
             }
         }
-        ,contentPadding = PaddingValues(0.dp)
+        ,contentPadding = PaddingValues(0.dp),
     )
 }

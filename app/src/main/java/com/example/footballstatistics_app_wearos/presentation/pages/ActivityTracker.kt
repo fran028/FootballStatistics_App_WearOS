@@ -18,9 +18,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,8 @@ import com.example.footballstatistics_app_wearos.presentation.TimerState
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
+import com.example.footballstatistics_app_wearos.presentation.data.CurrentMatch
+import com.example.footballstatistics_app_wearos.presentation.data.matchDataStore
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.red
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
@@ -59,6 +63,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -73,10 +79,27 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
         )
     )
 
-    var showFirstChip by remember { mutableStateOf(true) }
+    val currentMatch = CurrentMatch.match
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(key1 = Unit) {
+        scope.launch {
+            context.matchDataStore.data.collect {
+                CurrentMatch.setMatch(it)
+            }
+        }
+    }
+
     var showDialog by remember { mutableStateOf(false) }
 
-    val time = "00:00"
+    var iniTime = LocalTime.now()
+
+    val today: LocalDate = LocalDate.now()
+    val formatterDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    val formattedDate: String = today.format(formatterDate)
+
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -88,6 +111,8 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     // Format the time
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
     val formattedTime = currentTime.format(formatter)
+
+    val formatedInitime = iniTime.format(formatter)
 
     val viewModel = viewModel<StopWatchViewModel>()
     val timerState by viewModel.timerState.collectAsStateWithLifecycle()
@@ -201,12 +226,25 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         .fillMaxSize()
                         .background(black)
                         .padding(5.dp),
-                    columnState = columnState
+                    columnState = columnState,
                 ) {
                     item {
                         ChipButton(
                             text = "End Match",
                             onClick = {
+
+                                currentMatch?.date = formattedDate
+                                currentMatch?.total_time= stopWatchText
+                                currentMatch?.iniTime= formatedInitime
+                                currentMatch?.endTime= formattedTime
+                                currentMatch?.end_location= "Location"
+
+                                scope.launch {
+                                    context.matchDataStore.updateData {
+                                        currentMatch!!
+                                    }
+                                }
+
                                 viewModel.resetTimer()
                                 navController.navigate("Activity_Result")
                                 showDialog = false

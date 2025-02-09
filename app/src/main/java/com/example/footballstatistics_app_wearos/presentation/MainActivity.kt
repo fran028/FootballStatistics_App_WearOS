@@ -39,6 +39,7 @@ import com.example.footballstatistics_app_wearos.presentation.pages.ActivityCali
 import com.example.footballstatistics_app_wearos.presentation.pages.ActivityResultPage
 import com.example.footballstatistics_app_wearos.presentation.pages.ActivitySetUpPage
 import com.example.footballstatistics_app_wearos.presentation.pages.ActivityTrackerPage
+import com.example.footballstatistics_app_wearos.presentation.pages.CountdownPage
 import com.example.footballstatistics_app_wearos.presentation.pages.MenuPage
 import com.example.footballstatistics_app_wearos.presentation.theme.FootballStatistics_App_WearOSTheme
 import kotlinx.serialization.Serializable
@@ -72,6 +73,9 @@ class MainActivity : ComponentActivity() {
                     composable("Activity_Calibrate/{location}"){
                         val location = it.arguments?.getString("location")
                         ActivityCalibratePage(navController = navController, location = location.toString())
+                    }
+                    composable("Countdown"){
+                        CountdownPage(navController = navController)
                     }
                     composable("Activity_Tracker"){
                         ActivityTrackerPage(navController = navController)

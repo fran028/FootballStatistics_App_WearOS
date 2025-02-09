@@ -2,76 +2,55 @@ package com.example.footballstatistics_app_wearos.presentation.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.ContentDataType.Companion.Date
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.wear.compose.material.ChipDefaults.chipColors
-import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.Match
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
+import com.example.footballstatistics_app_wearos.presentation.data.CurrentMatch
+import com.example.footballstatistics_app_wearos.presentation.data.Match
+import com.example.footballstatistics_app_wearos.presentation.data.matchDataStore
 import com.example.footballstatistics_app_wearos.presentation.green
-import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
-import com.example.footballstatistics_app_wearos.presentation.theme.fontFamily
-import com.example.footballstatistics_app_wearos.presentation.white
 import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
-import com.google.android.horologist.compose.material.Chip
-import com.google.android.horologist.compose.material.ListHeaderDefaults.firstItemPadding
-import com.google.android.horologist.compose.material.ResponsiveListHeader
-import java.util.Date
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
 fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
 
-    /*val match1 = Match(
-        date = Date(),
-        start_time = Time,
-        end_time = TODO(),
-        total_time = TODO(),
-        match_id = TODO(),
-        away_corner_location = TODO(),
-        home_corner_location = TODO(),
-        kickoff_location = TODO(),
-        start_location = TODO(),
-        matchStatus = TODO(),
-        activityData = TODO(),
+    var createdMatch by remember { mutableStateOf<Match?>(null) }
 
+    val currentMatch = CurrentMatch.match
 
-        /*val start_time: String,
-        val end_time: String,
-        var total_time: String,
-        val match_id: String,
-        var away_corner_location: String,
-        var home_corner_location: String,
-        var kickoff_location: String,
-        val start_location: String,
-        var matchStatus: String = "Not Started",
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-        val activityData: String*/
-    )*/
+    LaunchedEffect(key1 = Unit) {
+        scope.launch {
+            context.matchDataStore.data.collect {
+                CurrentMatch.setMatch(it)
+            }
+        }
+    }
 
     val columnState = rememberResponsiveColumnState(
         contentPadding = ScalingLazyColumnDefaults.padding(
@@ -100,18 +79,38 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
             ChipButton(
                 text = "Start Match",
                 onClick = {
-
+                    createdMatch = Match(
+                        date = "00:00",
+                        total_time = "00:00",
+                        away_corner_location = "",
+                        home_corner_location = "",
+                        kickoff_location = "",
+                        start_location = "",
+                        matchStatus = "Not Started",
+                        activityData = "",
+                        iniTime = "",
+                        endTime = "",
+                        end_location = "",
+                    )
+                    CurrentMatch.setMatch(createdMatch!!)
+                    scope.launch {
+                        context.matchDataStore.updateData {
+                            createdMatch!!
+                        }
+                    }
                     navController.navigate("Activity") },
                 color = green,
                 icon = R.drawable.soccer,
                 navController =  navController
             )
         }
-        item {
-            Spacer(modifier = Modifier.height(5.dp))
-        }
-        item {
-            ChipButton(text = "Last Match", onClick = {navController.navigate("Activity_Result")}, color = yellow, icon = R.drawable.strategy, navController =  navController)
+        if(currentMatch != null){
+            item {
+                Spacer(modifier = Modifier.height(5.dp))
+            }
+            item {
+                ChipButton(text = "Last Match", onClick = {navController.navigate("Activity_Result")}, color = yellow, icon = R.drawable.strategy, navController =  navController)
+            }
         }
     }
 }
