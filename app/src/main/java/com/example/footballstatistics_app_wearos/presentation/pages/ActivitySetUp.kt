@@ -35,6 +35,7 @@ import com.example.footballstatistics_app_wearos.presentation.data.matchDataStor
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.white
+import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
@@ -69,6 +70,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
     )
     if (currentMatch != null) {
 
+
         if(currentMatch.kickoff_location == "" || currentMatch.home_corner_location == "" || currentMatch.away_corner_location == ""){
             startMatchButton = true
         } else {
@@ -90,6 +92,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                         .height(30.dp)// Adjust modifier as needed
                 )
             }
+
             item {
                 Spacer(modifier = Modifier.height(8.dp))
             }

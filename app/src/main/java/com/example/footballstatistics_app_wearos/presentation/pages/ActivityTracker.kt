@@ -28,6 +28,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
+import androidx.health.services.client.ExerciseClient
+import androidx.health.services.client.HealthServices
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,6 +70,21 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import android.Manifest
+import android.content.pm.PackageManager
+import android.health.connect.datatypes.ExerciseRoute
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.add
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.health.services.client.data.DataType
+import androidx.health.services.client.data.ExerciseCapabilities
+import androidx.health.services.client.data.ExerciseEvent
+import androidx.health.services.client.data.ExerciseState
+import androidx.health.services.client.data.ExerciseUpdate
+import kotlin.text.toDouble
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -117,6 +135,8 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     val viewModel = viewModel<StopWatchViewModel>()
     val timerState by viewModel.timerState.collectAsStateWithLifecycle()
     val stopWatchText by viewModel.stopWatchText.collectAsStateWithLifecycle()
+
+
 
     ScalingLazyColumn(modifier = Modifier
         .fillMaxSize()

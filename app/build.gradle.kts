@@ -77,4 +77,9 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:3.21.7")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    implementation("androidx.health:health-services-client:1.1.0-alpha05")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+
 }
