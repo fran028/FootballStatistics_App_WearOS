@@ -44,13 +44,6 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(key1 = Unit) {
-        scope.launch {
-            context.matchDataStore.data.collect {
-                CurrentMatch.setMatch(it)
-            }
-        }
-    }
 
     val columnState = rememberResponsiveColumnState(
         contentPadding = ScalingLazyColumnDefaults.padding(
