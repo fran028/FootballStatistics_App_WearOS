@@ -1,5 +1,6 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
+import android.content.Intent
 import androidx.activity.result.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
+import com.example.footballstatistics_app_wearos.presentation.WorkoutService
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
@@ -139,6 +141,8 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                                 currentMatch
                             }
                         }
+                        val intent = Intent(context, WorkoutService::class.java)
+                        context.startService(intent)
                         navController.navigate("Countdown") },
                     color = green,
                     icon = R.drawable.soccer,

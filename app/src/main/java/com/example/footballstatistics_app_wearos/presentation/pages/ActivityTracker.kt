@@ -71,6 +71,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.health.connect.datatypes.ExerciseRoute
 import android.util.Log
@@ -84,6 +85,8 @@ import androidx.health.services.client.data.ExerciseCapabilities
 import androidx.health.services.client.data.ExerciseEvent
 import androidx.health.services.client.data.ExerciseState
 import androidx.health.services.client.data.ExerciseUpdate
+import androidx.health.services.client.endExercise
+import com.example.footballstatistics_app_wearos.presentation.WorkoutService
 import kotlin.text.toDouble
 
 @OptIn(ExperimentalHorologistApi::class)
@@ -264,7 +267,8 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                                         currentMatch!!
                                     }
                                 }
-
+                                val intent = Intent(context, WorkoutService::class.java)
+                                context.stopService(intent)
                                 viewModel.resetTimer()
                                 navController.navigate("Activity_Result")
                                 showDialog = false

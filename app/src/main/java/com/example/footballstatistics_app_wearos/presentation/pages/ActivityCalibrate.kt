@@ -103,16 +103,16 @@ fun ActivityCalibratePage(modifier: Modifier = Modifier, navController: NavContr
         LocationServices.getFusedLocationProviderClient(context)
 
     val locationRequest = com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
-        .setWaitForAccurateLocation(false)
-        .setMinUpdateIntervalMillis(5000)
-        .setMaxUpdateDelayMillis(10000)
+        .setWaitForAccurateLocation(true)
+        .setMinUpdateIntervalMillis(1000)
+        .setMaxUpdateDelayMillis(5000)
         .build()
 
     val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             locationResult.lastLocation?.let { location ->
                 currentLocation = location
-                Log.d("Location", "Latitude: ${location.latitude}, Longitude: ${location.longitude}")
+                //Log.d("Location", "Latitude: ${location.latitude}, Longitude: ${location.longitude}")
             }
         }
     }

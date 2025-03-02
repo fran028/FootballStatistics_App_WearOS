@@ -78,8 +78,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation("com.google.android.gms:play-services-location:21.1.0")
- 
-    implementation("androidx.health.services:health-services-client:1.2.0-alpha03")
+
+
+    implementation("androidx.health:health-services-client:1.1.0-alpha05")
+    //implementation("androidx.health.services:health-services-client:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
 
