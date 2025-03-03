@@ -27,14 +27,14 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.WorkoutService
+import com.example.footballstatistics_app_wearos.presentation.MyExerciseService
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
-import com.example.footballstatistics_app_wearos.presentation.data.CurrentMatch
-import com.example.footballstatistics_app_wearos.presentation.data.Match
-import com.example.footballstatistics_app_wearos.presentation.data.matchDataStore
+import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
+import com.example.footballstatistics_app_wearos.presentation.data.MatchEntity
 import com.example.footballstatistics_app_wearos.presentation.green
+import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.white
 import com.example.footballstatistics_app_wearos.presentation.yellow
@@ -49,17 +49,30 @@ import kotlinx.coroutines.launch
 @Composable
 fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavController) {
 
-    val currentMatch = CurrentMatch.match
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val database = AppDatabase.getDatabase(context)
 
     var startMatchButton by remember { mutableStateOf(false) }
+    var isThereAnyMatch by remember { mutableStateOf(false) }
+    var isLocationSet by remember { mutableStateOf(false) }
+    var isKickOffLocationSet by remember { mutableStateOf(false) }
+    var isHomeCornerLocationSet by remember { mutableStateOf(false) }
+    var isAwayCornerLocationSet by remember { mutableStateOf(false) }
+    var matchId by remember { mutableStateOf(0) }
+    val (currentLocation, hasLocationPermission) = rememberLocationState(context)
+
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
-            context.matchDataStore.data.collect {
-                CurrentMatch.setMatch(it)
+            isThereAnyMatch = database.matchDao().isThereAnyMatch()
+            if (isThereAnyMatch) {
+                isLocationSet = database.matchDao().isLocationSet()
+                isKickOffLocationSet = database.matchDao().isKickoffSet()
+                isHomeCornerLocationSet = database.matchDao().isHomeCornersSet()
+                isAwayCornerLocationSet = database.matchDao().isAwayCornersSet()
+                matchId = database.matchDao().getMatchId()
             }
         }
     }
@@ -70,10 +83,8 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
             last = ScalingLazyColumnDefaults.ItemType.Chip
         )
     )
-    if (currentMatch != null) {
-
-
-        if(currentMatch.kickoff_location == "" || currentMatch.home_corner_location == "" || currentMatch.away_corner_location == ""){
+    if (isThereAnyMatch) {
+        if(isLocationSet){
             startMatchButton = true
         } else {
             startMatchButton = false
@@ -105,7 +116,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     color = blue,
                     icon = R.drawable.corner,
                     navController = navController,
-                    filled = if (currentMatch.away_corner_location == "") false else true
+                    filled = if (isAwayCornerLocationSet) false else true
                 )
             }
             item {
@@ -115,7 +126,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     color = blue,
                     icon = R.drawable.corner,
                     navController = navController,
-                    filled = if (currentMatch.home_corner_location == "") false else true
+                    filled = if (isHomeCornerLocationSet) false else true
                 )
             }
             item {
@@ -125,7 +136,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     color = blue,
                     icon = R.drawable.kickoff,
                     navController = navController,
-                    filled = if (currentMatch.kickoff_location == "") false else true
+                    filled = if (isKickOffLocationSet) false else true
                 )
             }
             item {
@@ -135,15 +146,16 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                 ChipButton(
                     text = "Start Match",
                     onClick = {
-                        currentMatch.start_location = "coordinates"
-                        scope.launch {
-                            context.matchDataStore.updateData {
-                                currentMatch
+                        if (currentLocation != null) {
+                            scope.launch {
+                                val currentMatch = database.matchDao().getMatchById(matchId)
+                                if (currentMatch != null) {
+                                    currentMatch?.start_location = "${currentLocation!!.latitude},${currentLocation!!.longitude}"
+                                    database.matchDao().updateMatch(currentMatch!!)
+                                }
                             }
                         }
-                        val intent = Intent(context, WorkoutService::class.java)
-                        context.startService(intent)
-                        navController.navigate("Countdown") },
+                        navController.navigate("Countdown")},
                     color = green,
                     icon = R.drawable.soccer,
                     navController = navController,

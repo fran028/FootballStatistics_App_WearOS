@@ -2,13 +2,10 @@ package com.example.footballstatistics_app_wearos.presentation.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,23 +17,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
-import androidx.health.services.client.ExerciseClient
-import androidx.health.services.client.HealthServices
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.wear.compose.material.Button
-import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
@@ -45,12 +34,9 @@ import com.example.footballstatistics_app_wearos.presentation.TimerState
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
-import com.example.footballstatistics_app_wearos.presentation.data.CurrentMatch
-import com.example.footballstatistics_app_wearos.presentation.data.matchDataStore
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.red
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
-import com.example.footballstatistics_app_wearos.presentation.theme.fontFamily
 import com.example.footballstatistics_app_wearos.presentation.white
 import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
@@ -59,35 +45,20 @@ import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
 import com.google.android.horologist.compose.material.Chip
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.health.connect.datatypes.ExerciseRoute
+import android.os.IBinder
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.add
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableStateListOf
-import androidx.health.services.client.data.DataType
-import androidx.health.services.client.data.ExerciseCapabilities
-import androidx.health.services.client.data.ExerciseEvent
-import androidx.health.services.client.data.ExerciseState
-import androidx.health.services.client.data.ExerciseUpdate
-import androidx.health.services.client.endExercise
-import com.example.footballstatistics_app_wearos.presentation.WorkoutService
-import kotlin.text.toDouble
+import androidx.health.services.client.impl.ipc.internal.ServiceConnection
+import com.example.footballstatistics_app_wearos.presentation.MyExerciseService
+import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
+import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -100,22 +71,31 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
         )
     )
 
-    val currentMatch = CurrentMatch.match
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val database = AppDatabase.getDatabase(context)
+
+    var isThereAnyMatch by remember { mutableStateOf(false) }
+    var matchId by remember { mutableStateOf(0) }
+    val (currentLocation, hasLocationPermission) = rememberLocationState(context)
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
-            context.matchDataStore.data.collect {
-                CurrentMatch.setMatch(it)
+            isThereAnyMatch = database.matchDao().isThereAnyMatch()
+            if (isThereAnyMatch) {
+                matchId = database.matchDao().getMatchId()
             }
         }
     }
 
+    val startIntent = Intent(context, MyExerciseService::class.java)
+    context.startForegroundService(startIntent)
+
+
     var showDialog by remember { mutableStateOf(false) }
 
-    var iniTime = LocalTime.now()
+    val iniTime = LocalTime.now()
 
     val today: LocalDate = LocalDate.now()
     val formatterDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -176,7 +156,12 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                             fontSize = 16.sp
                         )
                     },
-                    onClick = { showDialog = true },
+                    onClick = {
+                        val intent = Intent(context, MyExerciseService::class.java)
+                        intent.action = MyExerciseService.ACTION_PAUSE
+                        context.startService(intent)
+                        showDialog = true
+                    },
                     colors = chipColors(backgroundColor = red, contentColor = black),
                     shape = RoundedCornerShape(25.dp),
                     modifier = Modifier
@@ -199,7 +184,11 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                                 fontSize = 16.sp
                             )
                         },
-                        onClick = { viewModel.toggleIsRunning() },
+                        onClick = {
+                            viewModel.toggleIsRunning()
+                            val intent = Intent(context, MyExerciseService::class.java)
+                            intent.action = MyExerciseService.ACTION_PAUSE
+                            context.startForegroundService(intent) },
                         colors = chipColors(backgroundColor = blue, contentColor = black),
                         shape = RoundedCornerShape(25.dp),
                         modifier = Modifier
@@ -222,7 +211,12 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                                 fontSize = 16.sp
                             )
                         },
-                        onClick = { viewModel.toggleIsRunning()},
+                        onClick = {
+                            viewModel.toggleIsRunning()
+                            val intent = Intent(context, MyExerciseService::class.java)
+                            intent.action = MyExerciseService.ACTION_RESUME
+                            context.startService(intent)
+                        },
                         colors = chipColors(backgroundColor = green, contentColor = black),
                         shape = RoundedCornerShape(25.dp),
                         modifier = Modifier
@@ -256,19 +250,23 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                             text = "End Match",
                             onClick = {
 
-                                currentMatch?.date = formattedDate
-                                currentMatch?.total_time= stopWatchText
-                                currentMatch?.iniTime= formatedInitime
-                                currentMatch?.endTime= formattedTime
-                                currentMatch?.end_location= "Location"
+                                val serviceIntent = Intent(context, MyExerciseService::class.java)
+                                context.stopService(serviceIntent)
+
 
                                 scope.launch {
-                                    context.matchDataStore.updateData {
-                                        currentMatch!!
+                                    val currentMatch = database.matchDao().getMatchById(matchId)
+                                    val currentCoordinates = "${currentLocation?.latitude}, ${currentLocation?.longitude}"
+                                    if (currentMatch != null) {
+                                        currentMatch.date = formattedDate
+                                        currentMatch.total_time = stopWatchText
+                                        currentMatch.iniTime = formatedInitime
+                                        currentMatch.endTime = formattedTime
+                                        currentMatch.end_location = currentCoordinates
+
+                                        database.matchDao().updateMatch(currentMatch)
                                     }
                                 }
-                                val intent = Intent(context, WorkoutService::class.java)
-                                context.stopService(intent)
                                 viewModel.resetTimer()
                                 navController.navigate("Activity_Result")
                                 showDialog = false
@@ -284,7 +282,12 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                     item {
                         ChipButton(
                             text = "Continue Match",
-                            onClick = { showDialog = false },
+                            onClick = {
+                                val intent = Intent(context, MyExerciseService::class.java)
+                                intent.action = MyExerciseService.ACTION_RESUME
+                                context.startService(intent)
+                                showDialog = false
+                            },
                             color = blue,
                             icon = R.drawable.play,
                             navController = navController

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+    id("kotlin-kapt")
 }
 
 android {
@@ -16,6 +17,13 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["permissions"] = listOf(
+            "android.permission.BODY_SENSORS",
+            "android.permission.ACCESS_FINE_LOCATION",
+            "android.permission.ACTIVITY_RECOGNITION",
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.WAKE_LOCK"
+        )
 
     }
 
@@ -57,32 +65,40 @@ dependencies {
     implementation(libs.ui.text.google.fonts)
     implementation(libs.material3.android)
     implementation(libs.datastore.core.android)
+    implementation(libs.room.common)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
-    implementation("androidx.wear.compose:compose-material")
-    implementation("com.google.android.horologist:horologist-compose-layout:0.6.22")
-    implementation("com.google.android.horologist:horologist-compose-material:0.6.22")
-    implementation("androidx.wear.compose:compose-navigation:1.4.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
+    implementation(libs.horologist.compose.layout)
+    implementation(libs.horologist.compose.material)
+    implementation(libs.compose.navigation)
+    implementation(libs.lifecycle.runtime.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.runtime.compose.v287)
+    implementation(libs.kotlinx.serialization.json.v163)
+
+    implementation(libs.datastore)
+    implementation(libs.datastore.preferences)
+    implementation(libs.protobuf.javalite)
+
+    implementation(libs.play.services.location)
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-
-    implementation("androidx.datastore:datastore:1.0.0")
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
-    implementation("com.google.protobuf:protobuf-javalite:3.21.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-
-    implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 
 
-    implementation("androidx.health:health-services-client:1.1.0-alpha05")
-    //implementation("androidx.health.services:health-services-client:1.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    val room_version = "2.6.1"
+
+    implementation("androidx.room:room-runtime:$room_version")
+    annotationProcessor("androidx.room:room-compiler:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+    implementation("androidx.room:room-rxjava2:$room_version")
+    implementation("androidx.room:room-rxjava3:$room_version")
+    implementation("androidx.room:room-guava:$room_version")
+    testImplementation("androidx.room:room-testing:$room_version")
+    implementation("androidx.room:room-paging:$room_version")
+
 
 
 

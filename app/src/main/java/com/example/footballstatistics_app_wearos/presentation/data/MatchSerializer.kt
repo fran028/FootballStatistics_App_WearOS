@@ -8,7 +8,7 @@ import java.io.OutputStream
 import kotlin.concurrent.write
 import kotlin.text.decodeToString
 import kotlin.text.encodeToByteArray
-
+/*
 object MatchSerializer : androidx.datastore.core.Serializer<Match> {
     override val defaultValue: Match
         get() = Match(
@@ -45,4 +45,4 @@ object MatchSerializer : androidx.datastore.core.Serializer<Match> {
             ).encodeToByteArray()
         )
     }
-}
+}*/

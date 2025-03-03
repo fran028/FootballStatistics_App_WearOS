@@ -1,11 +1,15 @@
 package com.example.footballstatistics_app_wearos.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
@@ -20,32 +24,25 @@ import com.example.footballstatistics_app_wearos.presentation.pages.ActivitySetU
 import com.example.footballstatistics_app_wearos.presentation.pages.ActivityTrackerPage
 import com.example.footballstatistics_app_wearos.presentation.pages.CountdownPage
 import com.example.footballstatistics_app_wearos.presentation.pages.MenuPage
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.util.Log
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 
 
 class MainActivity : ComponentActivity() {
 
     private val permissions = arrayOf(
         Manifest.permission.BODY_SENSORS,
-        Manifest.permission.ACTIVITY_RECOGNITION,
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.FOREGROUND_SERVICE,
-        Manifest.permission.WAKE_LOCK,
-        Manifest.permission.HIGH_SAMPLING_RATE_SENSORS
+        Manifest.permission.ACTIVITY_RECOGNITION,
+        Manifest.permission.FOREGROUND_SERVICE
     )
-    private val requestCode = 100
+
+    private val permissionRequestCode = 123
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
-        requestPermissions()
         setTheme(android.R.style.Theme_DeviceDefault)
+
+        requestPermissions()
 
         setContent {
 
@@ -85,11 +82,10 @@ class MainActivity : ComponentActivity() {
     private fun requestPermissions() {
         val permissionsToRequest = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
+        }.toTypedArray()
+
         if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), requestCode)
-        } else {
-            Log.d("MainActivity", "Permissions already granted")
+            ActivityCompat.requestPermissions(this, permissionsToRequest, permissionRequestCode)
         }
     }
 
@@ -99,22 +95,15 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == this.requestCode) {
+        if (requestCode == permissionRequestCode) {
             if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                startWorkoutService()
+                // Permissions granted, proceed with your logic
             } else {
-                Log.e("MainActivity", "Permissions not granted")
+                // Permissions denied, handle accordingly
             }
         }
     }
-
-    private fun startWorkoutService() {
-        val intent = Intent(this, WorkoutService::class.java)
-        startService(intent)
-    }
 }
-
-
 
 
 @Composable
@@ -125,15 +114,3 @@ inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(navControll
     }
     return viewModel(parentEntry)
 }
-
-/*
-val healthClient = HealthServices.getClient(this /*context*/)
-val exerciseClient = healthClient.exerciseClient
-lifecycleScope.launch {
-    val capabilities = exerciseClient.getCapabilitiesAsync().await()
-    if (ExerciseType.RUNNING in capabilities.supportedExerciseTypes) {
-        val runningCapabilities =
-            capabilities.getExerciseTypeCapabilities(ExerciseType.RUNNING)
-    }
-}
-*/

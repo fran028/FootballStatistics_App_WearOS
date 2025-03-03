@@ -1,5 +1,6 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
@@ -22,9 +23,8 @@ import androidx.navigation.NavController
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
-import com.example.footballstatistics_app_wearos.presentation.data.CurrentMatch
-import com.example.footballstatistics_app_wearos.presentation.data.Match
-import com.example.footballstatistics_app_wearos.presentation.data.matchDataStore
+import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
+import com.example.footballstatistics_app_wearos.presentation.data.MatchEntity
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
@@ -37,13 +37,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
 
-    var createdMatch by remember { mutableStateOf<Match?>(null) }
-
-    val currentMatch = CurrentMatch.match
-
+    var isThereAnyMatch by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val database = AppDatabase.getDatabase(context)
 
+    LaunchedEffect(key1 = Unit) {
+        scope.launch {
+            isThereAnyMatch = database.matchDao().isThereAnyMatch()
+        }
+    }
 
     val columnState = rememberResponsiveColumnState(
         contentPadding = ScalingLazyColumnDefaults.padding(
@@ -72,23 +75,25 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
             ChipButton(
                 text = "Start Match",
                 onClick = {
-                    createdMatch = Match(
-                        date = "00:00",
-                        total_time = "00:00",
-                        away_corner_location = "",
-                        home_corner_location = "",
-                        kickoff_location = "",
-                        start_location = "",
-                        matchStatus = "Not Started",
-                        activityData = "",
-                        iniTime = "",
-                        endTime = "",
-                        end_location = "",
-                    )
-                    CurrentMatch.setMatch(createdMatch!!)
                     scope.launch {
-                        context.matchDataStore.updateData {
-                            createdMatch!!
+                        try {
+                            database.matchDao().deleteAllMatches()
+                            database.locationDataDao().deleteAllLocationData()
+                            val newMatch = MatchEntity(
+                                date = "",
+                                total_time = "",
+                                iniTime = "",
+                                endTime = "",
+                                away_corner_location = "",
+                                home_corner_location = "",
+                                kickoff_location = "",
+                                start_location = "",
+                                end_location = "",
+                                matchStatus = "Not Started",
+                            )
+                            database.matchDao().insertMatch(newMatch)
+                        } catch (e: Exception) {
+                            Log.e("MenuPage", "Error deleting data", e)
                         }
                     }
                     navController.navigate("Activity") },
@@ -97,7 +102,7 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
                 navController =  navController
             )
         }
-        if(currentMatch != null){
+        if(isThereAnyMatch){
             item {
                 Spacer(modifier = Modifier.height(5.dp))
             }
