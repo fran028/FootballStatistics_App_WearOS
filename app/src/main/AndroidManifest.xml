@@ -60,10 +60,9 @@
         </activity>
 
         <service
-            android:name=".MyExerciseService"
+            android:name=".presentation.MyExerciseService"
             android:foregroundServiceType="location|health"
-            android:exported="false"
-            tools:ignore="MissingClass" />
+            android:exported="false"  />
 
 
     </application>

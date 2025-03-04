@@ -112,13 +112,17 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
                 navController =  navController
             )
         }
-        if(isThereAnyMatch){
-            item {
-                Spacer(modifier = Modifier.height(5.dp))
-            }
-            item {
-                ChipButton(text = "Last Match", onClick = {navController.navigate("Activity_Result")}, color = yellow, icon = R.drawable.strategy, navController =  navController)
-            }
+        item {
+            Spacer(modifier = Modifier.height(5.dp))
         }
-    }
+        item {
+            ChipButton(
+                text = "Last Match",
+                onClick = {navController.navigate("Activity_Result")},
+                color = yellow,
+                icon = R.drawable.strategy,
+                navController =  navController,
+                disabled = !isThereAnyMatch)
+        }
+}
 }

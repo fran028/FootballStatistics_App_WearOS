@@ -1,5 +1,6 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -10,9 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,15 +23,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
+import com.example.footballstatistics_app_wearos.presentation.components.LoadingScreen
 import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
 import com.example.footballstatistics_app_wearos.presentation.data.MatchEntity
 import com.example.footballstatistics_app_wearos.presentation.gray
+import com.example.footballstatistics_app_wearos.presentation.presentation.ActivityResultViewModel
+import com.example.footballstatistics_app_wearos.presentation.presentation.ActivityResultViewModelFactory
 import com.example.footballstatistics_app_wearos.presentation.red
 import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.white
@@ -41,7 +44,10 @@ import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -56,30 +62,19 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val database = AppDatabase.getDatabase(context)
+    val viewModel: ActivityResultViewModel = viewModel(factory = ActivityResultViewModelFactory(database))
 
-    var isThereAnyMatch by remember { mutableStateOf(false) }
-    var matchId by remember { mutableIntStateOf(0) }
-    var currentMatch: MatchEntity? by remember { mutableStateOf(null) }
-
-    LaunchedEffect(key1 = Unit) {
-        scope.launch {
-            isThereAnyMatch = database.matchDao().isThereAnyMatch()
-            if (isThereAnyMatch) {
-                matchId = database.matchDao().getMatchId()
-                currentMatch = database.matchDao().getMatchById(matchId)
-                isLoading = false
-            }
+    if (viewModel.isLoading) {
+        Log.d("ActivitySetUpPage", "Loading...")
+        LoadingScreen(columnState)
+    } else {
+        if(viewModel.currentMatch == null){
+            navController.navigate("Menu")
         }
-    }
-    if (isThereAnyMatch) {
-
-
-
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,90 +90,78 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                         .height(30.dp)// Adjust modifier as needed
                 )
             }
-            if (isLoading) {
-                item {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Loading ",
-                            fontFamily = LeagueGothic,
-                            color = white,
-                            fontSize = 40.sp
-                        )
-                    }
-                }
-            } else {
-                val iniTime = currentMatch?.iniTime
-                val endTime = currentMatch?.endTime
-                val timer = currentMatch?.total_time
-                item {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Match Result ",
-                            fontFamily = LeagueGothic,
-                            color = white,
-                            fontSize = 24.sp
-                        )
-                        Text(
-                            text = "$iniTime - $endTime",
-                            fontFamily = LeagueGothic,
-                            color = yellow,
-                            fontSize = 16.sp,
-                        )
-                    }
-                }
-                item {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = (timer) ?: "0",
-                            fontFamily = LeagueGothic,
-                            color = white,
-                            fontSize = 40.sp
-                        )
-                        Text(
-                            text = "Activity Time",
-                            fontFamily = LeagueGothic,
-                            color = gray,
-                            fontSize = 16.sp,
-                        )
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                item {
-                    ChipButton(
-                        text = "Upload Match",
-                        onClick = { navController.navigate("Menu") },
-                        color = blue,
-                        icon = R.drawable.uploading,
-                        navController = navController
+            val iniTime = viewModel.currentMatch?.iniTime
+            val endTime = viewModel.currentMatch?.endTime
+            val timer = viewModel.currentMatch?.total_time
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Match Result ",
+                        fontFamily = LeagueGothic,
+                        color = white,
+                        fontSize = 24.sp
                     )
-                }
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-                item {
-                    ChipButton(
-                        text = "Delete Match",
-                        onClick = { showDeleteDialog = true },
-                        color = red,
-                        icon = R.drawable.trash,
-                        navController = navController
-                    )
-                }
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-                item {
-                    ChipButton(
-                        text = "Back to Menu",
-                        onClick = { navController.navigate("Menu") },
+                    Text(
+                        text = "$iniTime - $endTime",
+                        fontFamily = LeagueGothic,
                         color = yellow,
-                        icon = R.drawable.left,
-                        navController = navController
+                        fontSize = 16.sp,
                     )
                 }
             }
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = (timer) ?: "0",
+                        fontFamily = LeagueGothic,
+                        color = white,
+                        fontSize = 40.sp
+                    )
+                    Text(
+                        text = "Activity Time",
+                        fontFamily = LeagueGothic,
+                        color = gray,
+                        fontSize = 16.sp,
+                    )
+                }
+            }
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            item {
+                ChipButton(
+                    text = "Upload Match",
+                    onClick = { navController.navigate("Menu") },
+                    color = blue,
+                    icon = R.drawable.uploading,
+                    navController = navController
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+            item {
+                ChipButton(
+                    text = "Delete Match",
+                    onClick = { showDeleteDialog = true },
+                    color = red,
+                    icon = R.drawable.trash,
+                    navController = navController
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+            item {
+                ChipButton(
+                    text = "Back to Menu",
+                    onClick = { navController.navigate("Menu") },
+                    color = yellow,
+                    icon = R.drawable.left,
+                    navController = navController
+                )
+            }
+
         }
         if (showDeleteDialog) {
             Dialog(
@@ -195,8 +178,24 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                             ChipButton(
                                 text = "Delete",
                                 onClick = {
-                                    navController.navigate("Menu")
-                                    showDeleteDialog = false
+                                    scope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                val matchesInMemory = database.matchDao().getAllMatches()
+                                                for (match in matchesInMemory) {
+                                                    database.matchDao().deleteMatchById(match.id)
+                                                    database.locationDataDao().deleteLocationDataByMatchId(match.id)
+                                                }
+                                                Log.d("MenuPage", "Match deleted")
+                                            }
+                                            Log.d("MenuPage", "Navigate to Menu")
+                                            showDeleteDialog = false
+                                            navController.navigate("Menu")
+
+                                        } catch (e: Exception) {
+                                            Log.e("MenuPage", "Error when deleteing match", e)
+                                        }
+                                    }
                                 },
                                 color = red,
                                 icon = R.drawable.trash,
@@ -260,7 +259,5 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                 }
             )
         }
-    } else {
-        navController.navigate("Menu")
     }
 }

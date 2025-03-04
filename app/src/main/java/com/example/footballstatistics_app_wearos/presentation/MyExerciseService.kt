@@ -15,6 +15,7 @@ import androidx.health.services.client.ExerciseUpdateCallback
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.clearUpdateCallback
 import androidx.health.services.client.data.Availability
+import androidx.health.services.client.data.DataPoint
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
@@ -22,22 +23,19 @@ import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.health.services.client.data.LocationAvailability
 import androidx.health.services.client.data.LocationData
-//import androidx.health.services.client.data.LocationPoint
-//import androidx.health.services.client.data.LocationSamplingConfiguration
 import androidx.health.services.client.endExercise
 import androidx.health.services.client.getCapabilities
-import androidx.health.services.client.getCurrentExerciseInfo
 import androidx.health.services.client.pauseExercise
 import androidx.health.services.client.resumeExercise
 import androidx.health.services.client.startExercise
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
+import com.example.footballstatistics_app_wearos.presentation.data.LocationDataEntity
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-//import kotlinx.coroutines.tasks.await
 
 class MyExerciseService : Service() {
 
@@ -56,21 +54,10 @@ class MyExerciseService : Service() {
     private val exerciseUpdateCallback = object : ExerciseUpdateCallback {
         override fun onExerciseUpdateReceived(event: ExerciseUpdate) {
             Log.d("MyExerciseService", "Exercise Update: $event")
-            /*val latestMetrics = event.latestMetrics
-            latestMetrics. { (dataType, dataPoint) ->
-                if (dataType == DataType.LOCATION) {
-                    val locationData = dataPoint as LocationData
-                    locationData.locations.forEach { locationPoint ->
-                        Log.d(
-                            "MyExerciseService",
-                            "Location: ${locationPoint.latitude}, ${locationPoint.longitude}"
-                        )
-                        // Store locationPoint data
-                        storeLocationData(locationPoint)
-                    }
-                }
-            }*/
+            val latestMetrics = event.latestMetrics
+            Log.d("MyExerciseService", "Latest Metrics: $latestMetrics")
         }
+
 
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {
             Log.d("MyExerciseService", "Lap Summary: $lapSummary")
@@ -92,18 +79,8 @@ class MyExerciseService : Service() {
         }
     }
 
-    fun checkAvailability() {
-        coroutineScope.launch {
-            val exerciseInfo = exerciseClient.getCurrentExerciseInfo()
-            when (exerciseInfo.exerciseTrackedStatus) {
-                /*OTHER_APP_IN_PROGRESS -> // Warn user before continuing, will stop the existing workout.
-                OWNED_EXERCISE_IN_PROGRESS -> // This app has an existing workout.
-                NO_EXERCISE_IN_PROGRESS -> // Start a fresh workout.*/
-            }
-        }
-    }
-
     override fun onCreate() {
+        Log.d("MyExerciseService", "Service Created")
         super.onCreate()
         exerciseClient = HealthServices.getClient(this).exerciseClient
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -111,8 +88,10 @@ class MyExerciseService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("MyExerciseService", "Service Started (onStartCommand())")
         startForeground(1, createNotification())
         if (!exerciseStarted) {
+            Log.d("MyExerciseService", "Starting exercise...")
             startExercise()
             exerciseStarted = true
         }
@@ -120,6 +99,7 @@ class MyExerciseService : Service() {
     }
 
     private fun startExercise() {
+        Log.d("MyExerciseService", "Starting exercise... (startExercise())")
         coroutineScope.launch {
             try {
                 val supportedExerciseTypes = exerciseClient.getCapabilities().supportedExerciseTypes
@@ -148,7 +128,9 @@ class MyExerciseService : Service() {
             val locationDataEntity = LocationDataEntity(
                 latitude = locationPoint.latitude,
                 longitude = locationPoint.longitude,
-                timestamp = locationPoint.time.toEpochMilli()
+                timestamp = locationPoint.time.toEpochMilli(),
+                id = TODO(),
+                matchId = database.matchDao().getMatchId()
             )
             database.locationDataDao().insertLocationData(locationDataEntity)
         }

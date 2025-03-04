@@ -71,7 +71,6 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
         )
     )
 
-
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val database = AppDatabase.getDatabase(context)
@@ -79,6 +78,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     var isThereAnyMatch by remember { mutableStateOf(false) }
     var matchId by remember { mutableStateOf(0) }
     val (currentLocation, hasLocationPermission) = rememberLocationState(context)
+    var isServiceRunning by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
@@ -89,8 +89,14 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
         }
     }
 
-    val startIntent = Intent(context, MyExerciseService::class.java)
-    context.startForegroundService(startIntent)
+    LaunchedEffect(key1 = true) {
+        if (!isServiceRunning) {
+            val startIntent = Intent(context, MyExerciseService::class.java)
+            context.startForegroundService(startIntent)
+            isServiceRunning = true
+            Log.d("ActivityTrackerPage", "Service Executed")
+        }
+    }
 
 
     var showDialog by remember { mutableStateOf(false) }
@@ -158,6 +164,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                     },
                     onClick = {
                         val intent = Intent(context, MyExerciseService::class.java)
+                        Log.d("ActivityTrackerPage", "Stop button clicked")
                         intent.action = MyExerciseService.ACTION_PAUSE
                         context.startService(intent)
                         showDialog = true
@@ -187,6 +194,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         onClick = {
                             viewModel.toggleIsRunning()
                             val intent = Intent(context, MyExerciseService::class.java)
+                            Log.d("ActivityTrackerPage", "Pause button clicked")
                             intent.action = MyExerciseService.ACTION_PAUSE
                             context.startForegroundService(intent) },
                         colors = chipColors(backgroundColor = blue, contentColor = black),
@@ -214,6 +222,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         onClick = {
                             viewModel.toggleIsRunning()
                             val intent = Intent(context, MyExerciseService::class.java)
+                            Log.d("ActivityTrackerPage", "Resume button clicked")
                             intent.action = MyExerciseService.ACTION_RESUME
                             context.startService(intent)
                         },
@@ -249,10 +258,9 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         ChipButton(
                             text = "End Match",
                             onClick = {
-
+                                Log.d("ActivityTrackerPage", "End button clicked")
                                 val serviceIntent = Intent(context, MyExerciseService::class.java)
                                 context.stopService(serviceIntent)
-
 
                                 scope.launch {
                                     val currentMatch = database.matchDao().getMatchById(matchId)
