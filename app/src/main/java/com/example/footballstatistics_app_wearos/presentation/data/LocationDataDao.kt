@@ -16,6 +16,9 @@ interface LocationDataDao {
     @Query("DELETE FROM location_data")
     suspend fun deleteAllLocationData()
 
+    @Query("DELETE FROM location_data WHERE match_id = :id")
+    suspend fun deleteLocationDataByMatchId(id: Int)
+
     @Query("UPDATE location_data SET latitude = :latitude, longitude = :longitude WHERE id = :id")
     suspend fun updateLocationDataById(id: Int, latitude: Double, longitude: Double)
 

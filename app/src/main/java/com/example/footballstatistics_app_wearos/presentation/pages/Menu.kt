@@ -31,7 +31,9 @@ import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -77,26 +79,34 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
                 onClick = {
                     scope.launch {
                         try {
-                            database.matchDao().deleteAllMatches()
-                            database.locationDataDao().deleteAllLocationData()
-                            val newMatch = MatchEntity(
-                                date = "",
-                                total_time = "",
-                                iniTime = "",
-                                endTime = "",
-                                away_corner_location = "",
-                                home_corner_location = "",
-                                kickoff_location = "",
-                                start_location = "",
-                                end_location = "",
-                                matchStatus = "Not Started",
-                            )
-                            database.matchDao().insertMatch(newMatch)
+                            withContext(Dispatchers.IO) {
+                                val matchesInMemory = database.matchDao().getAllMatches()
+                                for (match in matchesInMemory) {
+                                    database.matchDao().deleteMatchById(match.id)
+                                    database.locationDataDao().deleteLocationDataByMatchId(match.id)
+                                }
+                                val newMatch = MatchEntity(
+                                    date = "",
+                                    total_time = "",
+                                    iniTime = "",
+                                    endTime = "",
+                                    away_corner_location = "",
+                                    home_corner_location = "",
+                                    kickoff_location = "",
+                                    start_location = "",
+                                    end_location = "",
+                                    matchStatus = "Not Started",
+                                )
+                                database.matchDao().insertMatch(newMatch)
+                                Log.d("MenuPage", "Match created")
+                            }
+                            Log.d("MenuPage", "Navigate to Activity")
+                            navController.navigate("Activity")
                         } catch (e: Exception) {
-                            Log.e("MenuPage", "Error deleting data", e)
+                            Log.e("MenuPage", "Error when starting match", e)
                         }
                     }
-                    navController.navigate("Activity") },
+                },
                 color = green,
                 icon = R.drawable.soccer,
                 navController =  navController

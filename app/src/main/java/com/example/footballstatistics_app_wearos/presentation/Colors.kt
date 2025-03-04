@@ -3,7 +3,8 @@ package com.example.footballstatistics_app_wearos.presentation
 import androidx.compose.ui.graphics.Color
 
 
-val black: Color = Color(0xff242424)
+//val black: Color = Color(0xff242424)
+val black: Color = Color.Black
 val white: Color = Color(0xffe6e6e6)
 val red: Color = Color(0xfff94545)
 val blue: Color = Color(0xff7da8e8)

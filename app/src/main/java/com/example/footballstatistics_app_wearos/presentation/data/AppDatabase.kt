@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [LocationDataEntity::class, MatchEntity::class], version = 2)
+@Database(entities = [LocationDataEntity::class, MatchEntity::class], version = 3)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun locationDataDao(): LocationDataDao
     abstract fun matchDao(): MatchDao

@@ -21,12 +21,10 @@ interface MatchDao {
     suspend fun getMatchById(matchId: Int): MatchEntity?
 
     @Query("DELETE FROM matches WHERE id = :matchId")
-    suspend fun deleteMatchById(matchId: String)
+    suspend fun deleteMatchById(matchId: Int)
 
     @Query("DELETE FROM matches")
     suspend fun deleteAllMatches()
-
-
 
     suspend fun isThereAnyMatch(): Boolean {
         val matches = getAllMatches()
