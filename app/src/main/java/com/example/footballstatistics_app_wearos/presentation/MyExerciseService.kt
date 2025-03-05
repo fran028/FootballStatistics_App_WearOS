@@ -5,24 +5,24 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.compose.foundation.gestures.forEach
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.health.services.client.ExerciseClient
 import androidx.health.services.client.ExerciseUpdateCallback
 import androidx.health.services.client.HealthServices
 import androidx.health.services.client.clearUpdateCallback
 import androidx.health.services.client.data.Availability
-import androidx.health.services.client.data.DataPoint
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
 import androidx.health.services.client.data.LocationAvailability
-import androidx.health.services.client.data.LocationData
 import androidx.health.services.client.endExercise
 import androidx.health.services.client.getCapabilities
 import androidx.health.services.client.pauseExercise
@@ -30,14 +30,24 @@ import androidx.health.services.client.resumeExercise
 import androidx.health.services.client.startExercise
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
-import com.example.footballstatistics_app_wearos.presentation.data.LocationDataEntity
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.Manifest
+import android.os.Binder
+import android.os.Looper
+import androidx.room.Room
+import com.example.footballstatistics_app_wearos.presentation.data.LocationDataEntity
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.Priority
+import java.time.Instant
 
 class MyExerciseService : Service() {
+    val TAG = "MyExerciseService"
 
     private lateinit var exerciseClient: ExerciseClient
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -49,15 +59,32 @@ class MyExerciseService : Service() {
     companion object {
         const val ACTION_PAUSE = "com.example.footballstatistics_app_wearos.ACTION_PAUSE"
         const val ACTION_RESUME = "com.example.footballstatistics_app_wearos.ACTION_RESUME"
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 333
+    }
+
+    private val binder = LocalBinder()
+
+    inner class LocalBinder : Binder() {
+        fun getService(): MyExerciseService = this@MyExerciseService
+    }
+
+    override fun onBind(intent: Intent): IBinder {
+        return binder
+    }
+
+    fun handleLocationUpdate(location: Location) {
+        Log.d("MyExerciseService", "Location received: ${location.latitude}, ${location.longitude}")
+        storeLocationData(location)
     }
 
     private val exerciseUpdateCallback = object : ExerciseUpdateCallback {
-        override fun onExerciseUpdateReceived(event: ExerciseUpdate) {
-            Log.d("MyExerciseService", "Exercise Update: $event")
-            val latestMetrics = event.latestMetrics
-            Log.d("MyExerciseService", "Latest Metrics: $latestMetrics")
+        override fun onExerciseUpdateReceived(update: ExerciseUpdate) {
+            val latestMetrics = update.latestMetrics
+            Log.d(TAG, "Exercise Update Metrics: $latestMetrics")
+            Log.d(TAG, "Exercise Metrics dataType: ${latestMetrics.dataTypes}")
+            Log.d(TAG, "Exercise Metrics dataPoints: ${latestMetrics.sampleDataPoints}")
+            Log.d(TAG, "Exercise Metrics statisticalDataPoints: ${latestMetrics.statisticalDataPoints}")
         }
-
 
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {
             Log.d("MyExerciseService", "Lap Summary: $lapSummary")
@@ -79,12 +106,44 @@ class MyExerciseService : Service() {
         }
     }
 
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            for (location in locationResult.locations) {
+                handleLocationUpdate(location)
+            }
+        }
+    }
+
     override fun onCreate() {
         Log.d("MyExerciseService", "Service Created")
         super.onCreate()
         exerciseClient = HealthServices.getClient(this).exerciseClient
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        database = Room.databaseBuilder(
+            applicationContext,
+            AppDatabase::class.java, "football_database"
+        ).build()
         createNotificationChannel()
+    }
+
+    private fun requestLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
+                .setWaitForAccurateLocation(false)
+                .setMinUpdateIntervalMillis(500)
+                .setMaxUpdateDelayMillis(1000)
+                .build()
+
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -93,6 +152,7 @@ class MyExerciseService : Service() {
         if (!exerciseStarted) {
             Log.d("MyExerciseService", "Starting exercise...")
             startExercise()
+            requestLocationUpdates()
             exerciseStarted = true
         }
         return START_STICKY
@@ -123,22 +183,24 @@ class MyExerciseService : Service() {
         }
     }
 
-    /*private fun storeLocationData(locationPoint: LocationPoint) {
+    private fun storeLocationData(location: Location) {
         coroutineScope.launch {
+            val matchId = database.matchDao().getMatchId() ?: 1 // Default to 1 if no match ID is found
             val locationDataEntity = LocationDataEntity(
-                latitude = locationPoint.latitude,
-                longitude = locationPoint.longitude,
-                timestamp = locationPoint.time.toEpochMilli(),
-                id = TODO(),
-                matchId = database.matchDao().getMatchId()
+                latitude = location.latitude,
+                longitude = location.longitude,
+                timestamp = Instant.ofEpochMilli(location.time).toEpochMilli(),
+                matchId = matchId
             )
             database.locationDataDao().insertLocationData(locationDataEntity)
         }
-    }*/
+    }
 
     override fun onDestroy() {
         super.onDestroy()
         stopExercise()
+        fusedLocationClient.removeLocationUpdates(locationCallback) // Stop updates
+
     }
 
     private fun stopExercise() {

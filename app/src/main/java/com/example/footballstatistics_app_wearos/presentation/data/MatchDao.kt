@@ -33,17 +33,17 @@ interface MatchDao {
 
     suspend fun isKickoffSet(): Boolean {
         val matches = getAllMatches()
-        return matches.isNotEmpty() && matches[0].kickoff_location != null
+        return matches.isNotEmpty() && matches[0].kickoff_location != null && matches[0].kickoff_location != ""
     }
 
     suspend fun isAwayCornersSet(): Boolean {
         val matches = getAllMatches()
-        return matches.isNotEmpty() && matches[0].away_corner_location != null
+        return matches.isNotEmpty() && matches[0].away_corner_location != null && matches[0].away_corner_location != ""
     }
 
     suspend fun isHomeCornersSet(): Boolean {
         val matches = getAllMatches()
-        return matches.isNotEmpty() && matches[0].home_corner_location != null
+        return matches.isNotEmpty() && matches[0].home_corner_location != null && matches[0].home_corner_location != ""
     }
 
     suspend fun isLocationSet(): Boolean {
@@ -51,7 +51,7 @@ interface MatchDao {
         val kickoff = isKickoffSet()
         val awayCorners = isAwayCornersSet()
         val homeCorners = isHomeCornersSet()
-        return matches.isNotEmpty() && !(kickoff || awayCorners || homeCorners)
+        return matches.isNotEmpty() && kickoff && awayCorners && homeCorners
     }
 
     suspend fun getMatchId(): Int {

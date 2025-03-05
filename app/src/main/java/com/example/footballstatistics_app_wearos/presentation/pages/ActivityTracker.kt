@@ -29,7 +29,7 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.StopWatchViewModel
+import com.example.footballstatistics_app_wearos.presentation.presentation.StopWatchViewModel
 import com.example.footballstatistics_app_wearos.presentation.TimerState
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
@@ -49,13 +49,8 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.os.IBinder
 import android.util.Log
-import androidx.compose.runtime.DisposableEffect
-import androidx.health.services.client.impl.ipc.internal.ServiceConnection
 import com.example.footballstatistics_app_wearos.presentation.MyExerciseService
 import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
 import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
@@ -79,6 +74,8 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     var matchId by remember { mutableStateOf(0) }
     val (currentLocation, hasLocationPermission) = rememberLocationState(context)
     var isServiceRunning by remember { mutableStateOf(false) }
+    var iniTime: LocalTime by remember { mutableStateOf(LocalTime.MIN) }
+    var formatedInitime by remember { mutableStateOf("") }
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
@@ -96,12 +93,15 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
             isServiceRunning = true
             Log.d("ActivityTrackerPage", "Service Executed")
         }
+        iniTime = LocalTime.now()
+        val formatter = DateTimeFormatter.ofPattern("HH:mm")
+        formatedInitime = iniTime.format(formatter)
+
     }
 
 
     var showDialog by remember { mutableStateOf(false) }
 
-    val iniTime = LocalTime.now()
 
     val today: LocalDate = LocalDate.now()
     val formatterDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -119,7 +119,6 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
     val formattedTime = currentTime.format(formatter)
 
-    val formatedInitime = iniTime.format(formatter)
 
     val viewModel = viewModel<StopWatchViewModel>()
     val timerState by viewModel.timerState.collectAsStateWithLifecycle()

@@ -27,6 +27,12 @@
     <uses-permission android:name="android.permission.health.READ_BASIC_METRICS" />
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE_DATA" />
 
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="31"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
     <application
         android:allowBackup="true"
@@ -63,6 +69,11 @@
             android:name=".presentation.MyExerciseService"
             android:foregroundServiceType="location|health"
             android:exported="false"  />
+
+        <service
+            android:name=".presentation.TransferDataService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false"/>
 
 
     </application>

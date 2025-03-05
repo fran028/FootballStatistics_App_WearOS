@@ -1,7 +1,8 @@
-package com.example.footballstatistics_app_wearos.presentation
+package com.example.footballstatistics_app_wearos.presentation.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.footballstatistics_app_wearos.presentation.TimerState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.util.Timer
 
 class StopWatchViewModel : ViewModel() {
 
@@ -51,7 +51,8 @@ class StopWatchViewModel : ViewModel() {
         when(timerState.value){
             TimerState.RUNNING -> _timerState.update { TimerState.PAUSED }
             TimerState.PAUSED,
-            TimerState.RESET -> _timerState.update { TimerState.RUNNING }
+            TimerState.RESET
+                -> _timerState.update { TimerState.RUNNING }
         }
     }
 

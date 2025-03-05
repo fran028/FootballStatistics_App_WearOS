@@ -35,6 +35,7 @@ import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
 import kotlinx.coroutines.launch
+import java.util.Date
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -59,7 +60,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
         LoadingScreen(columnState)
     } else {
         Log.d("ActivitySetUpPage", "Match found with ID: ${viewModel.matchId}")
-        startMatchButton = viewModel.isLocationSet
+        Log.d("ActivitySetUpPage", "Location set: ${viewModel.isLocationSet}")
 
         ScalingLazyColumn(
             modifier = Modifier
@@ -122,6 +123,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                                 val currentMatch = database.matchDao().getMatchById(viewModel.matchId)
                                 if (currentMatch != null) {
                                     currentMatch.start_location = "${currentLocation.latitude},${currentLocation.longitude}"
+                                    currentMatch.iniTime = Date().toString()
                                     database.matchDao().updateMatch(currentMatch)
                                 }
                             }
@@ -130,7 +132,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     color = green,
                     icon = R.drawable.soccer,
                     navController = navController,
-                    disabled = startMatchButton
+                    disabled = !viewModel.isLocationSet
                 )
             }
         }
