@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "8.9.0"
 composeNavigation = "1.4.0"
 datastore = "1.0.0"
 healthServicesClient = "1.1.0-alpha05"
