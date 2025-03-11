@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.datastore.core.android)
     implementation(libs.room.common)
     implementation(libs.material)
+    implementation(libs.lifecycle.service)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)

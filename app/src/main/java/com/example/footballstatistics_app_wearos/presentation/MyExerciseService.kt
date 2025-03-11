@@ -1,17 +1,22 @@
 package com.example.footballstatistics_app_wearos.presentation
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
+import androidx.activity.result.launch
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.getSystemService
 import androidx.health.services.client.ExerciseClient
 import androidx.health.services.client.ExerciseUpdateCallback
 import androidx.health.services.client.HealthServices
@@ -35,26 +40,26 @@ import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import android.Manifest
-import android.os.Binder
-import android.os.Looper
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.example.footballstatistics_app_wearos.presentation.data.LocationDataEntity
+import com.example.footballstatistics_app_wearos.presentation.data.MatchEntity
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
 import java.time.Instant
 
-class MyExerciseService : Service() {
+class MyExerciseService : LifecycleService() {
     val TAG = "MyExerciseService"
 
     private lateinit var exerciseClient: ExerciseClient
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private val coroutineScope = CoroutineScope(Dispatchers.IO)
+    private lateinit var database: AppDatabase
     private var exerciseStarted = false
     private var isExercisePaused = false
-    private lateinit var database: AppDatabase
 
     companion object {
         const val ACTION_PAUSE = "com.example.footballstatistics_app_wearos.ACTION_PAUSE"
@@ -69,6 +74,7 @@ class MyExerciseService : Service() {
     }
 
     override fun onBind(intent: Intent): IBinder {
+        super.onBind(intent)
         return binder
     }
 
@@ -121,7 +127,7 @@ class MyExerciseService : Service() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         database = Room.databaseBuilder(
             applicationContext,
-            AppDatabase::class.java, "football_database"
+            AppDatabase::class.java, "app_database"
         ).build()
         createNotificationChannel()
     }
@@ -147,6 +153,7 @@ class MyExerciseService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
         Log.d("MyExerciseService", "Service Started (onStartCommand())")
         startForeground(1, createNotification())
         if (!exerciseStarted) {
@@ -155,12 +162,12 @@ class MyExerciseService : Service() {
             requestLocationUpdates()
             exerciseStarted = true
         }
-        return START_STICKY
+        return START_STICKY // Corrected line
     }
 
     private fun startExercise() {
         Log.d("MyExerciseService", "Starting exercise... (startExercise())")
-        coroutineScope.launch {
+        lifecycleScope.launch {
             try {
                 val supportedExerciseTypes = exerciseClient.getCapabilities().supportedExerciseTypes
                 if (ExerciseType.RUNNING in supportedExerciseTypes) {
@@ -184,15 +191,31 @@ class MyExerciseService : Service() {
     }
 
     private fun storeLocationData(location: Location) {
-        coroutineScope.launch {
-            val matchId = database.matchDao().getMatchId() ?: 1 // Default to 1 if no match ID is found
-            val locationDataEntity = LocationDataEntity(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                timestamp = Instant.ofEpochMilli(location.time).toEpochMilli(),
-                matchId = matchId
-            )
-            database.locationDataDao().insertLocationData(locationDataEntity)
+        Log.d("MyExerciseService", "storeLocationData called")
+        lifecycleScope.launch {
+            try {
+                // Check if the database has been initialized:
+                if (!this@MyExerciseService::database.isInitialized) {
+                    Log.e("MyExerciseService", "Database was not initialized properly!")
+                    return@launch
+                }
+                val matchId = database.matchDao().getMatchId()
+                if (matchId != null) {
+                    val locationDataEntity = LocationDataEntity(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        timestamp = Instant.ofEpochMilli(location.time).toEpochMilli(),
+                        matchId = matchId
+                    )
+                    database.locationDataDao().insertLocationData(locationDataEntity)
+                    Log.d("MyExerciseService", "successfully saved location data")
+                } else {
+                    Log.e("MyExerciseService", "No matchId was found")
+                }
+
+            } catch (e: Exception) {
+                Log.e("MyExerciseService", "Error while accessing database", e)
+            }
         }
     }
 
@@ -204,19 +227,24 @@ class MyExerciseService : Service() {
     }
 
     private fun stopExercise() {
-        coroutineScope.launch {
+        lifecycleScope.launch {
             try {
                 exerciseClient.endExercise()
                 exerciseClient.clearUpdateCallback(exerciseUpdateCallback)
                 Log.d("MyExerciseService", "Exercise ended successfully")
             } catch (e: Exception) {
-                Log.e("MyExerciseService", "Error ending exercise", e)
+                if (e is kotlinx.coroutines.CancellationException){
+                    Log.w("MyExerciseService", "Exercise ending was cancelled", e)
+                } else {
+                    Log.e("MyExerciseService", "Error ending exercise", e)
+                }
+
             }
         }
     }
 
     fun pauseExercise() {
-        coroutineScope.launch {
+        lifecycleScope.launch {
             try {
                 if (!isExercisePaused) {
                     exerciseClient.pauseExercise()
@@ -230,7 +258,7 @@ class MyExerciseService : Service() {
     }
 
     fun resumeExercise() {
-        coroutineScope.launch {
+        lifecycleScope.launch {
             try {
                 if (isExercisePaused) {
                     exerciseClient.resumeExercise()
@@ -243,9 +271,6 @@ class MyExerciseService : Service() {
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
-    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

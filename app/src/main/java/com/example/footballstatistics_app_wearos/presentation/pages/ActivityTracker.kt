@@ -125,7 +125,6 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     val stopWatchText by viewModel.stopWatchText.collectAsStateWithLifecycle()
 
 
-
     ScalingLazyColumn(modifier = Modifier
         .fillMaxSize()
         .background(black)
@@ -275,7 +274,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                                     }
                                 }
                                 viewModel.resetTimer()
-                                navController.navigate("Activity_Result")
+                                navController.navigate("Result")
                                 showDialog = false
                             },
                             color = red,

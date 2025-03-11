@@ -118,7 +118,7 @@ fun MenuPage(modifier: Modifier = Modifier, navController: NavController) {
         item {
             ChipButton(
                 text = "Last Match",
-                onClick = {navController.navigate("Activity_Result")},
+                onClick = {navController.navigate("Result")},
                 color = yellow,
                 icon = R.drawable.strategy,
                 navController =  navController,

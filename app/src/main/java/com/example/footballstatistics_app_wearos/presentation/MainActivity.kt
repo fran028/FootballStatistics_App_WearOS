@@ -20,6 +20,7 @@ import com.example.footballstatistics_app_wearos.presentation.pages.ActivitySetU
 import com.example.footballstatistics_app_wearos.presentation.pages.ActivityTrackerPage
 import com.example.footballstatistics_app_wearos.presentation.pages.CountdownPage
 import com.example.footballstatistics_app_wearos.presentation.pages.MenuPage
+import com.example.footballstatistics_app_wearos.presentation.pages.UploadPage
 
 
 class MainActivity : ComponentActivity() {
@@ -110,8 +111,16 @@ fun MainScreen() {
                 ActivityTrackerPage(navController = navController)
             }
         }
-        composable("Activity_Result") {
-            ActivityResultPage(navController = navController)
+        navigation(
+            startDestination = "Activity_Result",
+            route = "Result"
+        ) {
+            composable("Activity_Result") {
+                ActivityResultPage(navController = navController)
+            }
+            composable("Upload_Match") {
+                UploadPage(navController = navController)
+            }
         }
     }
 }

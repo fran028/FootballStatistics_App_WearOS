@@ -22,12 +22,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
-import java.util.concurrent.TimeUnit
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 class TransferDataService : Service() {
 
     private lateinit var dataClient: DataClient
-    private var isSendingData = false
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private lateinit var database: AppDatabase
 
@@ -35,41 +34,50 @@ class TransferDataService : Service() {
         const val CHANNEL_ID = "DataChannel"
         const val NOTIFICATION_ID = 1
         const val DATA_PATH = "/all_data"
+
+        // Broadcast actions
+        const val TRANSFER_STARTED_ACTION = "com.example.footballstatistics_app_wearos.TRANSFER_STARTED"
+        const val TRANSFER_IN_PROGRESS_ACTION = "com.example.footballstatistics_app_wearos.TRANSFER_IN_PROGRESS"
+        const val TRANSFER_COMPLETE_ACTION = "com.example.footballstatistics_app_wearos.TRANSFER_COMPLETE"
+        const val TRANSFER_FAILED_ACTION = "com.example.footballstatistics_app_wearos.TRANSFER_FAILED"
+        const val TRANSFER_PROGRESS_EXTRA = "com.example.footballstatistics_app_wearos.TRANSFER_PROGRESS"
     }
 
     override fun onCreate() {
         super.onCreate()
         dataClient = Wearable.getDataClient(this)
+        database = AppDatabase.getDatabase(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         createNotificationChannel()
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
-        isSendingData = true
+
         startSendingData()
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        isSendingData = false
     }
 
     private fun startSendingData() {
-        Thread {
-            while (isSendingData) {
-                var matchData: List<MatchEntity> = emptyList()
-                var locationData: List<LocationDataEntity> = emptyList()
-                coroutineScope.launch {
-                    matchData = getMatchData()
-                    locationData = getLocationData()
-                    sendAllDataToPhone(dataClient, matchData, locationData)
-                    Log.d("Smartwatch", "Sending all data")
-                }
-                TimeUnit.SECONDS.sleep(5)
+        sendTransferStartedBroadcast()
+        coroutineScope.launch {
+            val matchData = getMatchData()
+            val locationData = getLocationData()
+            if (matchData.isEmpty() && locationData.isEmpty()){
+                sendTransferFailedBroadcast()
+                stopSelf()
+                return@launch
             }
-        }.start()
+
+            sendAllDataToPhone(dataClient, matchData, locationData)
+            Log.d("Smartwatch", "Sending all data")
+            sendTransferCompleteBroadcast()
+            stopSelf()
+        }
     }
 
     private fun sendAllDataToPhone(
@@ -84,13 +92,16 @@ class TransferDataService : Service() {
 
         val putDataRequest = dataMapRequest.asPutDataRequest()
         putDataRequest.setUrgent()
-        dataClient.putDataItem(putDataRequest)
-            .addOnSuccessListener {
-                Log.d("Smartwatch", "All data sent successfully")
-            }
-            .addOnFailureListener { e ->
+        coroutineScope.launch {
+            try {
+                dataClient.putDataItem(putDataRequest)
+
+            } catch (e: Exception) {
                 Log.e("Smartwatch", "Error sending all data", e)
+                sendTransferFailedBroadcast()
+                stopSelf()
             }
+        }
     }
 
     private suspend fun getMatchData(): List<MatchEntity> = withContext(Dispatchers.IO) {
@@ -142,5 +153,22 @@ class TransferDataService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
+    }
+    private fun sendTransferStartedBroadcast() {
+        val broadcastIntent = Intent(TRANSFER_STARTED_ACTION)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        Log.d("TransferDataService", "Broadcast started sent")
+    }
+
+
+    private fun sendTransferCompleteBroadcast() {
+        val broadcastIntent = Intent(TRANSFER_COMPLETE_ACTION)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        Log.d("TransferDataService", "Broadcast complete sent")
+    }
+    private fun sendTransferFailedBroadcast() {
+        val broadcastIntent = Intent(TRANSFER_FAILED_ACTION)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(broadcastIntent)
+        Log.d("TransferDataService", "Broadcast failed sent")
     }
 }

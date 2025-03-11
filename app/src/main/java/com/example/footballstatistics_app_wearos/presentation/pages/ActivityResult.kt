@@ -62,6 +62,7 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUploadDialog by remember { mutableStateOf(false) }
+    var matchData by remember { mutableStateOf(null as MatchEntity?) }
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -72,9 +73,11 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
         Log.d("ActivitySetUpPage", "Loading...")
         LoadingScreen(columnState)
     } else {
-        if(viewModel.currentMatch == null){
+        if(viewModel.currentMatch == null ){
             navController.navigate("Menu")
         }
+        matchData = viewModel.currentMatch
+
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -90,9 +93,9 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                         .height(30.dp)// Adjust modifier as needed
                 )
             }
-            val iniTime = viewModel.currentMatch?.iniTime
-            val endTime = viewModel.currentMatch?.endTime
-            val timer = viewModel.currentMatch?.total_time
+            val iniTime = matchData?.iniTime
+            val endTime = matchData?.endTime
+            val timer = matchData?.total_time
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -131,7 +134,7 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
             item {
                 ChipButton(
                     text = "Upload Match",
-                    onClick = { navController.navigate("Menu") },
+                    onClick = {  showUploadDialog = true},
                     color = blue,
                     icon = R.drawable.uploading,
                     navController = navController
@@ -232,12 +235,12 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                     ) {
                         item {
                             ChipButton(
-                                text = "Delete",
+                                text = "Upload",
                                 onClick = {
-                                    navController.navigate("Menu")
+                                    navController.navigate("Upload_Match")
                                     showUploadDialog = false
                                 },
-                                color = red,
+                                color = blue,
                                 icon = R.drawable.trash,
                                 navController = navController
                             )
