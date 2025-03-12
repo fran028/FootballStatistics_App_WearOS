@@ -16,7 +16,8 @@
     <uses-permission android:name="android.permission.health.READ_BASIC_METRICS" />
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE_DATA" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
     <!-- Features -->
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-feature android:name="android.hardware.location.gps" />
@@ -55,10 +56,15 @@
             android:foregroundServiceType="location|health"
             android:exported="false" />
 
+<!--        <service-->
+<!--            android:name=".presentation.TransferDataService"-->
+<!--            android:foregroundServiceType="connectedDevice"-->
+<!--            android:exported="false"/>-->
         <service
             android:name=".presentation.TransferDataService"
             android:foregroundServiceType="connectedDevice"
-            android:exported="false"/>
+            android:exported="false"
+            tools:ignore="MissingPermission" />
 
     </application>
 

@@ -1,10 +1,10 @@
 package com.example.footballstatistics_app_wearos.presentation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
-import android.os.Looper
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +23,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
+@SuppressLint("MissingPermission")
 @Composable
 fun rememberLocationState(context: Context): Pair<Location?, Boolean> {
     var currentLocation by remember { mutableStateOf<Location?>(null) }
@@ -34,50 +35,38 @@ fun rememberLocationState(context: Context): Pair<Location?, Boolean> {
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            hasLocationPermission = isGranted
-        }
-    )
-
-    LaunchedEffect(key1 = hasLocationPermission) {
-        if (!hasLocationPermission) {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
-
     val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
-
-    val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
-        .setWaitForAccurateLocation(true)
-        .setMinUpdateIntervalMillis(1000)
-        .setMaxUpdateDelayMillis(5000)
+    val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+        .setWaitForAccurateLocation(false)
+        .setMinUpdateIntervalMillis(2000)
+        .setMaxUpdateDelayMillis(10000)
         .build()
-
     val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
-            locationResult.lastLocation?.let { location ->
+            for (location in locationResult.locations) {
                 currentLocation = location
+                Log.d("LocationState", "Location received: ${location.latitude}, ${location.longitude}")
             }
         }
     }
-
-    DisposableEffect(key1 = hasLocationPermission) {
-        if (hasLocationPermission) {
-            try {
-                fusedLocationClient.requestLocationUpdates(
-                    locationRequest,
-                    locationCallback,
-                    Looper.getMainLooper()
-                )
-            } catch (e: SecurityException) {
-                Log.e("Location", "Security Exception: ${e.message}")
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            hasLocationPermission = isGranted
+            if(isGranted){
+                fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
             }
         }
 
+    LaunchedEffect(key1 = Unit) {
+        if (!hasLocationPermission) {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+        }
+    }
+
+    DisposableEffect(Unit) {
         onDispose {
             fusedLocationClient.removeLocationUpdates(locationCallback)
         }

@@ -241,7 +241,7 @@ fun ActivityResultPage(modifier: Modifier = Modifier, navController: NavControll
                                     showUploadDialog = false
                                 },
                                 color = blue,
-                                icon = R.drawable.trash,
+                                icon = R.drawable.uploading,
                                 navController = navController
                             )
                         }

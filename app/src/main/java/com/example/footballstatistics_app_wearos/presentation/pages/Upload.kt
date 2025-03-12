@@ -1,10 +1,12 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
-import android.content.BroadcastReceiver
-import android.content.Context
+import android.Manifest
 import android.content.Intent
-import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,82 +29,103 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
+import com.example.footballstatistics_app_wearos.presentation.MyApplication
 import com.example.footballstatistics_app_wearos.presentation.TransferDataService
 import com.example.footballstatistics_app_wearos.presentation.black
-import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
-import com.example.footballstatistics_app_wearos.presentation.white
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
-
-enum class TransferState {
-    NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED
-}
+import com.example.footballstatistics_app_wearos.presentation.green
+import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
+import com.example.footballstatistics_app_wearos.presentation.presentation.TransferEvent
+import com.example.footballstatistics_app_wearos.presentation.presentation.TransferState
+import com.example.footballstatistics_app_wearos.presentation.presentation.UploadViewModel
+import com.example.footballstatistics_app_wearos.presentation.red
+import com.example.footballstatistics_app_wearos.presentation.white
+import com.example.footballstatistics_app_wearos.presentation.yellow
 
 @Composable
-fun UploadPage(navController: NavController, listState: ScalingLazyListState = rememberScalingLazyListState()) {
+fun UploadPage(
+    navController: NavController,
+    listState: ScalingLazyListState = rememberScalingLazyListState()
+) {
     Log.d("Upload", "UploadPage")
     val context = LocalContext.current
+    val container = (context.applicationContext as MyApplication).container
+    val viewModel: UploadViewModel = container.uploadViewModel
 
     var transferState by remember { mutableStateOf(TransferState.NOT_STARTED) }
     var progress by remember { mutableIntStateOf(0) }
 
-    // Create a BroadcastReceiver
-    val transferReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                TransferDataService.TRANSFER_STARTED_ACTION -> {
-                    Log.d("UploadPage", "Transfer started")
-                    transferState = TransferState.IN_PROGRESS
-                }
+    var hasBluetoothConnectPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else Manifest.permission.BLUETOOTH
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasBluetoothScanPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.BLUETOOTH
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    var hasForegroundServicePermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.FOREGROUND_SERVICE
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
-                TransferDataService.TRANSFER_IN_PROGRESS_ACTION -> {
-                    val newProgress = intent.getIntExtra(TransferDataService.TRANSFER_PROGRESS_EXTRA, 0)
-                    Log.d("UploadPage", "Transfer in progress. Progress: $newProgress%")
-                    progress = newProgress
-                }
-
-                TransferDataService.TRANSFER_COMPLETE_ACTION -> {
-                    Log.d("UploadPage", "Transfer complete")
-                    transferState = TransferState.COMPLETED
-                    navController.navigate("ActivityResult") {
-                        popUpTo("Upload_Match"){
-                            inclusive = true
-                        }
-                    }
-                }
-                TransferDataService.TRANSFER_FAILED_ACTION -> {
-                    Log.d("UploadPage", "Transfer Failed")
-                    transferState = TransferState.FAILED
-                }
+    val bluetoothConnectPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            hasBluetoothConnectPermission = isGranted
+        }
+    val bluetoothScanPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            hasBluetoothScanPermission = isGranted
+        }
+    val foregroundServicePermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            hasForegroundServicePermission = isGranted
+        }
+    LaunchedEffect(key1 = Unit) {
+        if (!hasBluetoothConnectPermission) {
+            bluetoothConnectPermissionLauncher.launch(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else Manifest.permission.BLUETOOTH)
+        }
+        if (!hasBluetoothScanPermission) {
+            bluetoothScanPermissionLauncher.launch(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.BLUETOOTH)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !hasForegroundServicePermission) {
+            foregroundServicePermissionLauncher.launch(Manifest.permission.FOREGROUND_SERVICE)
+        }
+        if (hasBluetoothConnectPermission && hasBluetoothScanPermission) {
+            val serviceIntent = Intent(context, TransferDataService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
             }
         }
     }
 
-    // Register the BroadcastReceiver
-    DisposableEffect(Unit) {
-        val filter = IntentFilter().apply {
-            addAction(TransferDataService.TRANSFER_STARTED_ACTION)
-            addAction(TransferDataService.TRANSFER_IN_PROGRESS_ACTION)
-            addAction(TransferDataService.TRANSFER_COMPLETE_ACTION)
-            addAction(TransferDataService.TRANSFER_FAILED_ACTION)
-        }
-        LocalBroadcastManager.getInstance(context).registerReceiver(transferReceiver, filter)
-
-        onDispose {
-            LocalBroadcastManager.getInstance(context).unregisterReceiver(transferReceiver)
+    LaunchedEffect(viewModel.transferEvents) {
+        viewModel.transferEvents.collect { event ->
+            transferState = event.state
+            progress = event.progress
         }
     }
-
-    val serviceIntent = Intent(context, TransferDataService::class.java)
-    context.startService(serviceIntent) // Start the service
-
     ScalingLazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -112,85 +135,81 @@ fun UploadPage(navController: NavController, listState: ScalingLazyListState = r
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        item{
+        item {
             Spacer(modifier = Modifier.height(40.dp))
         }
 
         item {
             Image(
-                painter = painterResource(id = R.drawable.logobig),
-                contentDescription = "Logo big",
+                painter = painterResource(id = R.drawable.logobig), // Replace with your image resource
+                contentDescription = "App Logo",
                 modifier = Modifier
-                    .width(100.dp)
-                    .height(100.dp)
+                    .width(30.dp)
+                    .height(30.dp)// Adjust modifier as needed
             )
         }
 
-        item{
+        item {
             Spacer(modifier = Modifier.height(20.dp))
         }
 
         item {
             when (transferState) {
                 TransferState.NOT_STARTED -> {
-                    Text(
+                    ChipButton(
                         text = "Transfer Not Started",
-                        fontSize = 16.sp,
                         color = white,
-                        fontFamily = LeagueGothic,
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = { },
+                        navController = navController,
+                        icon = R.drawable.uploading
                     )
                 }
 
                 TransferState.IN_PROGRESS -> {
-                    Text(
-                        text = "Transfer In Progress",
-                        fontSize = 16.sp,
-                        color = white,
-                        fontFamily = LeagueGothic,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        text = "Progress: $progress%",
-                        fontSize = 16.sp,
-                        color = white,
-                        fontFamily = LeagueGothic,
-                        modifier = Modifier.fillMaxWidth()
+                    ChipButton(
+                        text = "Transfer In Progress: $progress%",
+                        color = blue,
+                        onClick = {
+                        },
+                        navController = navController,
+                        icon = R.drawable.uploading
                     )
                 }
 
                 TransferState.COMPLETED -> {
-                    Text(
+                    ChipButton(
                         text = "Transfer Complete",
-                        fontSize = 16.sp,
-                        color = white,
-                        fontFamily = LeagueGothic,
-                        modifier = Modifier.fillMaxWidth()
+                        color = green,
+                        onClick = {  },
+                        navController = navController,
+                        icon = R.drawable.complete
                     )
                 }
+
                 TransferState.FAILED -> {
-                    Text(
+                    ChipButton(
                         text = "Transfer Failed",
-                        fontSize = 16.sp,
-                        color = white,
-                        fontFamily = LeagueGothic,
-                        modifier = Modifier.fillMaxWidth()
+                        color = red,
+                        onClick = {
+                        },
+                        navController = navController,
+                        icon = R.drawable.uploading
                     )
                 }
             }
         }
-        item {
-            if (transferState == TransferState.COMPLETED) {
+        if(transferState == TransferState.COMPLETED){
+            item {
                 Spacer(modifier = Modifier.height(20.dp))
-                ChipButton(
-                    text = "Go back",
-                    onClick = {
-                        navController.navigate("Result")
-                    },
-                    color = blue,
-                    icon = R.drawable.complete,
-                    navController = navController
-                )
+            }
+            item{
+            ChipButton(
+                text = "Back to Menu",
+                color = yellow,
+                onClick = { navController.navigate("Menu") },
+                navController = navController,
+                icon = R.drawable.left
+            )
             }
         }
     }
