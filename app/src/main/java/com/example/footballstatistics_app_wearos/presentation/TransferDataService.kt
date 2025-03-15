@@ -51,7 +51,7 @@ class TransferDataService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("TransferDataService", "Service started")
-        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS,0))
+        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS, 0))
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             if (checkSelfPermission(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE) == PackageManager.PERMISSION_GRANTED) {
@@ -65,7 +65,7 @@ class TransferDataService : Service() {
                 )
             } else {
                 stopSelf()
-                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED))
+                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
             }
         } else {
             createNotificationChannel()
@@ -75,39 +75,86 @@ class TransferDataService : Service() {
         coroutineScope.launch {
             try {
                 sendDataToPhone()
-                viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED))
-                stopSelf()
+                if (viewModel.getTransferState() == TransferState.COMPLETED) {
+                    Log.d("TransferDataService", "COMPLETED")
+                    stopSelf()
+                }
             } catch (e: Exception) {
-                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED))
-                Log.e("TransferDataService", "Error sending data", e)
+                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
+                Log.e("TransferDataService", "Error sending data FAILED", e)
+                stopSelf()
             }
         }
 
         return START_STICKY
     }
+
     private suspend fun sendDataToPhone() {
+        Log.d("TransferDataService", "Sending data to phone")
         val matches = database.matchDao().getAllMatches()
         val locationData = database.locationDataDao().getAllLocationData()
 
+        val chunkSize = 10
+        val matchChunks = matches.chunked(chunkSize)
+        val locationDataChunks = locationData.chunked(chunkSize)
+
+        val totalMatchChunks = matchChunks.size
+        val totalLocationChunks = locationDataChunks.size
+        val totalChunks = totalMatchChunks + totalLocationChunks + 2 // +2 for start and end
+
+        var chunksSent = 0
+        var locationChunksSent = 0
+        var matchChunksSent = 0
+
         val gson = Gson()
-        val matchesJson = gson.toJson(matches)
-        val locationDataJson = gson.toJson(locationData)
-
-        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS,50))
-
-        val request = PutDataMapRequest.create("/transfer_data").run {
-            dataMap.putString("matches", matchesJson)
-            dataMap.putString("location_data", locationDataJson)
-            setUrgent()
-            asPutDataRequest()
+        //send start
+        sendChunk(gson.toJson(TransferData("start","")), "/transfer_data")
+        chunksSent++
+        viewModel.sendTransferEvent(
+            TransferEvent(
+                TransferState.IN_PROGRESS,
+                (chunksSent * 100) / totalChunks
+            )
+        )
+        for (chunk in matchChunks) {
+            val matchesJson = gson.toJson(TransferData("matches", chunk))
+            sendChunk(matchesJson, "/transfer_data")
+            chunksSent++
+            matchChunksSent++
+            Log.d("TransferDataService", "Match Chunks sent: $matchChunksSent / $totalMatchChunks")
+            viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks))
         }
+
+        for (chunk in locationDataChunks) {
+            val locationDataJson = gson.toJson(TransferData("location_data", chunk))
+            sendChunk(locationDataJson, "/transfer_data")
+            chunksSent++
+            locationChunksSent++
+            Log.d("TransferDataService", "Location Chunks sent: $locationChunksSent / $totalLocationChunks")
+            viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks ))
+        }
+        //send end
+        sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
+        chunksSent++
+        viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED,(chunksSent * 100) / totalChunks))
+        Log.d("TransferDataService", "Data sent to phone")
+    }
+
+    private suspend fun sendChunk(json: String, path: String) {
+        Log.d("TransferDataService", "Sending chunk to phone")
+        val request = PutDataMapRequest.create(path).apply {
+            dataMap.putString("data", json)
+        }.asPutDataRequest()
+
         try {
             dataClient.putDataItem(request)
-            viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS,100))
-        }catch (e: Exception) {
+            Log.d("TransferDataService", "Chunk sent to phone")
+        } catch (e: Exception) {
+            viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
             Log.e("TransferDataService", "Error sending data", e)
         }
     }
+    data class TransferData(val type: String, val data: Any)
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

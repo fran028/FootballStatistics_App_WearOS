@@ -12,14 +12,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,13 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.MyApplication
 import com.example.footballstatistics_app_wearos.presentation.TransferDataService
@@ -42,8 +39,6 @@ import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
 import com.example.footballstatistics_app_wearos.presentation.green
-import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
-import com.example.footballstatistics_app_wearos.presentation.presentation.TransferEvent
 import com.example.footballstatistics_app_wearos.presentation.presentation.TransferState
 import com.example.footballstatistics_app_wearos.presentation.presentation.UploadViewModel
 import com.example.footballstatistics_app_wearos.presentation.red
@@ -59,9 +54,10 @@ fun UploadPage(
     val context = LocalContext.current
     val container = (context.applicationContext as MyApplication).container
     val viewModel: UploadViewModel = container.uploadViewModel
+    val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
+    val progress = viewModel.getTransferProgress()
+    val transferState = viewModel.getTransferState()
 
-    var transferState by remember { mutableStateOf(TransferState.NOT_STARTED) }
-    var progress by remember { mutableIntStateOf(0) }
 
     var hasBluetoothConnectPermission by remember {
         mutableStateOf(
@@ -113,17 +109,18 @@ fun UploadPage(
         if (hasBluetoothConnectPermission && hasBluetoothScanPermission) {
             val serviceIntent = Intent(context, TransferDataService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Log.d("Upload", "UploadPage, starting service")
                 context.startForegroundService(serviceIntent)
             } else {
+                Log.d("Upload", "UploadPage, starting service")
                 context.startService(serviceIntent)
             }
         }
     }
 
-    LaunchedEffect(viewModel.transferEvents) {
-        viewModel.transferEvents.collect { event ->
-            transferState = event.state
-            progress = event.progress
+    LaunchedEffect(viewModel.transferEvent) {
+        viewModel.transferEvent.collect {
+            Log.d("Upload", "UploadPage, event = ${it.state}, progress = ${it.progress}")
         }
     }
     ScalingLazyColumn(
@@ -203,13 +200,13 @@ fun UploadPage(
                 Spacer(modifier = Modifier.height(20.dp))
             }
             item{
-            ChipButton(
-                text = "Back to Menu",
-                color = yellow,
-                onClick = { navController.navigate("Menu") },
-                navController = navController,
-                icon = R.drawable.left
-            )
+                ChipButton(
+                    text = "Back to Menu",
+                    color = yellow,
+                    onClick = { navController.navigate("Menu") },
+                    navController = navController,
+                    icon = R.drawable.left
+                )
             }
         }
     }

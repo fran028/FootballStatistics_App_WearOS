@@ -12,7 +12,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.footballstatistics_app_wearos"
+        applicationId = "com.example.footballstatisticsapp.wearable"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
@@ -105,6 +105,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+
+    implementation("io.insert-koin:koin-android:3.5.3")
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 
 
 }
