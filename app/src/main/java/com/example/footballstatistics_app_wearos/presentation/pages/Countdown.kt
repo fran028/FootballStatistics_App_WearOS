@@ -69,7 +69,7 @@ fun CountdownPage(navController: NavController) {
             Text(
                 text = if (countdownValue > 0) countdownValue.toString() else "Game Start!",
                 fontFamily = LeagueGothic,
-                fontSize = 60.sp,
+                fontSize = 40.sp,
                 color = white
             )
         }

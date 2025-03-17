@@ -18,8 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.presentation.ActivitySetUpViewModel
 import com.example.footballstatistics_app_wearos.presentation.black
@@ -30,11 +32,16 @@ import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.presentation.ActivitySetUpViewModelFactory
 import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
+import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
+import com.example.footballstatistics_app_wearos.presentation.white
+import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
+import com.google.android.horologist.compose.material.Chip
 import kotlinx.coroutines.launch
+import org.w3c.dom.Text
 import java.util.Date
 
 @OptIn(ExperimentalHorologistApi::class)
@@ -77,9 +84,52 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                         .height(30.dp)// Adjust modifier as needed
                 )
             }
-
             item {
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+            item {
+                ChipButton(
+                    text = "Start Match",
+                    onClick = {
+                        if (currentLocation != null) {
+                            scope.launch {
+                                val currentMatch = database.matchDao().getMatchById(viewModel.matchId)
+                                if (currentMatch != null) {
+                                    currentMatch.start_location = "${currentLocation.latitude},${currentLocation.longitude}"
+                                    currentMatch.iniTime = Date().toString()
+                                    database.matchDao().updateMatch(currentMatch)
+                                }
+                            }
+                        }
+                        navController.navigate("Countdown")},
+                    color = green,
+                    icon = R.drawable.soccer,
+                    navController = navController,
+                    disabled = !viewModel.isLocationSet
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+            item {
+                if(!viewModel.isLocationSet) {
+                    Text(
+                        text = "To start first set opposite corners and center location",
+                        fontFamily = LeagueGothic,
+                        fontSize = 16.sp,
+                        color = white
+                    )
+                } else {
+                    Text(
+                        text = "Locations Set",
+                        fontFamily = LeagueGothic,
+                        fontSize = 24.sp,
+                        color = green
+                    )
+                }
+            }
+            item{
+                Spacer(modifier = Modifier.height(2.dp))
             }
             item {
                 ChipButton(
@@ -111,30 +161,7 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     filled = viewModel.isKickOffLocationSet
                 )
             }
-            item {
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-            item {
-                ChipButton(
-                    text = "Start Match",
-                    onClick = {
-                        if (currentLocation != null) {
-                            scope.launch {
-                                val currentMatch = database.matchDao().getMatchById(viewModel.matchId)
-                                if (currentMatch != null) {
-                                    currentMatch.start_location = "${currentLocation.latitude},${currentLocation.longitude}"
-                                    currentMatch.iniTime = Date().toString()
-                                    database.matchDao().updateMatch(currentMatch)
-                                }
-                            }
-                        }
-                        navController.navigate("Countdown")},
-                    color = green,
-                    icon = R.drawable.soccer,
-                    navController = navController,
-                    disabled = !viewModel.isLocationSet
-                )
-            }
+
         }
     }
 }

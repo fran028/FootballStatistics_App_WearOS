@@ -51,7 +51,7 @@ fun ChipButton(text: String, onClick: () -> Unit, color: Color, icon: Int, navCo
 
     if(disabled){
         bgcolor = black
-        fontColor = gray
+        fontColor = white
         borderColor = gray
     }
 
