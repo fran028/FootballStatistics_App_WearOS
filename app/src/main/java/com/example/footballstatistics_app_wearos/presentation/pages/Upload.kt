@@ -33,7 +33,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.MyApplication
+import com.example.footballstatistics_app_wearos.presentation.FootballStatisticsApplication
 import com.example.footballstatistics_app_wearos.presentation.TransferDataService
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
@@ -52,7 +52,7 @@ fun UploadPage(
 ) {
     Log.d("Upload", "UploadPage")
     val context = LocalContext.current
-    val container = (context.applicationContext as MyApplication).container
+    val container = (context.applicationContext as FootballStatisticsApplication).container
     val viewModel: UploadViewModel = container.uploadViewModel
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
     val progress = viewModel.getTransferProgress()
