@@ -110,7 +110,7 @@ class TransferDataService : Service() {
 
         val totalMatchChunks = matchChunks.size
         val totalLocationChunks = locationDataChunks.size
-        val totalChunks = totalMatchChunks + totalLocationChunks + 2 // +2 for start and end
+        val totalChunks = totalMatchChunks + totalLocationChunks + 2
 
         var chunksSent = 0
         var locationChunksSent = 0
@@ -144,7 +144,7 @@ class TransferDataService : Service() {
             viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks ))
         }
         //send end
-        sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
+            sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
         chunksSent++
         viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED,(chunksSent * 100) / totalChunks))
         Log.d("TransferDataService", "Data sent to phone")
