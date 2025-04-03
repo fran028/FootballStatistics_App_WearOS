@@ -37,10 +37,10 @@ fun rememberLocationState(context: Context): Pair<Location?, Boolean> {
     }
     val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
-    val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+    val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
         .setWaitForAccurateLocation(false)
-        .setMinUpdateIntervalMillis(2000)
-        .setMaxUpdateDelayMillis(10000)
+        .setMinUpdateIntervalMillis(500)
+        .setMaxUpdateDelayMillis(1000)
         .build()
     val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {

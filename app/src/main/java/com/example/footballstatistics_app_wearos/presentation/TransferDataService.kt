@@ -19,6 +19,7 @@ import com.example.footballstatistics_app_wearos.presentation.presentation.Trans
 import com.example.footballstatistics_app_wearos.presentation.presentation.TransferState
 import com.example.footballstatistics_app_wearos.presentation.presentation.UploadViewModel
 import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.NodeClient
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.gson.Gson
@@ -30,7 +31,7 @@ import kotlinx.coroutines.launch
 
 class TransferDataService : Service() {
     private val CHANNEL_ID = "TransferDataServiceChannel"
-    private val NOTIFICATION_ID = 1002
+    private val NOTIFICATION_ID = 1001
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var dataClient: DataClient
     private lateinit var database: AppDatabase
@@ -44,9 +45,18 @@ class TransferDataService : Service() {
         super.onCreate()
         Log.d("TransferDataService", "Service created")
         dataClient = Wearable.getDataClient(this)
-        val container = (application as MyApplication).container
+        val container = (application as FootballStatisticsApplication).container
         database = container.database
         viewModel = container.uploadViewModel
+
+        val nodeClient: NodeClient = Wearable.getNodeClient(this)
+        isPhoneConnected(nodeClient) { isConnected ->
+            if (isConnected) {
+                Log.d("TransferDataService", "Phone is connected")
+            } else {
+                Log.d("TransferDataService", "Phone is not connected")
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -100,7 +110,7 @@ class TransferDataService : Service() {
 
         val totalMatchChunks = matchChunks.size
         val totalLocationChunks = locationDataChunks.size
-        val totalChunks = totalMatchChunks + totalLocationChunks + 2 // +2 for start and end
+        val totalChunks = totalMatchChunks + totalLocationChunks + 2
 
         var chunksSent = 0
         var locationChunksSent = 0
@@ -118,7 +128,7 @@ class TransferDataService : Service() {
         )
         for (chunk in matchChunks) {
             val matchesJson = gson.toJson(TransferData("matches", chunk))
-            sendChunk(matchesJson, "/transfer_data")
+            sendChunk(matchesJson, "/match_data")
             chunksSent++
             matchChunksSent++
             Log.d("TransferDataService", "Match Chunks sent: $matchChunksSent / $totalMatchChunks")
@@ -127,32 +137,35 @@ class TransferDataService : Service() {
 
         for (chunk in locationDataChunks) {
             val locationDataJson = gson.toJson(TransferData("location_data", chunk))
-            sendChunk(locationDataJson, "/transfer_data")
+            sendChunk(locationDataJson, "/location_data")
             chunksSent++
             locationChunksSent++
             Log.d("TransferDataService", "Location Chunks sent: $locationChunksSent / $totalLocationChunks")
             viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks ))
         }
         //send end
-        sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
+            sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
         chunksSent++
         viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED,(chunksSent * 100) / totalChunks))
         Log.d("TransferDataService", "Data sent to phone")
     }
 
     private suspend fun sendChunk(json: String, path: String) {
-        Log.d("TransferDataService", "Sending chunk to phone")
+        Log.d("TransferDataService", "Sending chunk to phone $path")
         val request = PutDataMapRequest.create(path).apply {
             dataMap.putString("data", json)
+            dataMap.putLong("Time", System.currentTimeMillis())
         }.asPutDataRequest()
-
-        try {
-            dataClient.putDataItem(request)
-            Log.d("TransferDataService", "Chunk sent to phone")
-        } catch (e: Exception) {
-            viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
-            Log.e("TransferDataService", "Error sending data", e)
-        }
+        Log.d("TransferDataService", "Request created $request")
+        dataClient.putDataItem(request)
+            .addOnSuccessListener {
+                Log.d("TransferDataService", "Chunk sent to phone successfully!")
+                // Possibly update UI or app state to reflect successful send
+            }
+            .addOnFailureListener { e ->
+                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
+                Log.e("TransferDataService", "Error sending data: ${e.message}", e)
+            }
     }
     data class TransferData(val type: String, val data: Any)
 
@@ -184,6 +197,18 @@ class TransferDataService : Service() {
             .setContentIntent(pendingIntent)
             .build()
     }
+
+    fun isPhoneConnected(nodeClient: NodeClient, onConnectionResult: (Boolean) -> Unit) {
+        nodeClient.connectedNodes.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                onConnectionResult(task.result.isNotEmpty())
+            } else {
+                // Handle error (e.g., log it)
+                onConnectionResult(false)
+            }
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
