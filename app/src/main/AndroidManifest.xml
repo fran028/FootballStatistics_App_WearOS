@@ -23,7 +23,8 @@
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-feature android:name="android.hardware.location.gps" />
 
-    <application
+
+<application
         android:name=".presentation.FootballStatisticsApplication"
         android:allowBackup="true"
         android:icon="@mipmap/logoapp"
@@ -56,6 +57,7 @@
         <service
             android:name=".presentation.MyExerciseService"
             android:foregroundServiceType="location|health"
+            android:enabled="true"
             android:exported="false" />
 
         <service

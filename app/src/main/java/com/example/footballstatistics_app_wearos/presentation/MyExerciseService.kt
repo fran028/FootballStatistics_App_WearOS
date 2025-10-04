@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.location.Location
 import android.os.Binder
 import android.os.Build
@@ -105,11 +106,43 @@ class MyExerciseService : LifecycleService() {
         }
     }
 
-    private val locationCallback = object : LocationCallback() {
+    /*private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             for (location in locationResult.locations) {
                 handleLocationUpdate(location)
             }
+        }
+    }*/
+
+    // And a more robust locationCallback
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            // Get the latest location from the result list
+            val latestLocation = locationResult.lastLocation ?: return
+
+            // --- VALIDATION (VERY IMPORTANT) ---
+            // 1. Check if the location is recent. Ignore if it's too old.
+            val locationAgeMillis = System.currentTimeMillis() - latestLocation.time
+            if (locationAgeMillis > 5000) { // e.g., ignore if older than 5 seconds
+                Log.w(TAG, "Ignoring stale location. Age: ${locationAgeMillis / 1000}s")
+                return
+            }
+
+            // 2. Check for minimum accuracy. Football fields are open, so we can demand good accuracy.
+            if (latestLocation.hasAccuracy() && latestLocation.accuracy > 20) { // e.g., ignore if accuracy is worse than 20 meters
+                Log.w(TAG, "Ignoring inaccurate location. Accuracy: ${latestLocation.accuracy}m")
+                return
+            }
+
+            // 3. From Android 8.0 (API 26), check if it's a mocked location (less common, but good practice)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && latestLocation.isFromMockProvider) {
+                Log.w(TAG, "Ignoring mocked location.")
+                return
+            }
+
+            // --- If all checks pass, handle the valid location ---
+            Log.d(TAG, "VALID location received: ${latestLocation.latitude}, ${latestLocation.longitude}, Accuracy: ${latestLocation.accuracy}m")
+            handleLocationUpdate(latestLocation)
         }
     }
 
@@ -125,7 +158,7 @@ class MyExerciseService : LifecycleService() {
         createNotificationChannel()
     }
 
-    private fun requestLocationUpdates() {
+    /*private fun requestLocationUpdates() {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -143,9 +176,32 @@ class MyExerciseService : LifecycleService() {
                 Looper.getMainLooper()
             )
         }
+    }*/
+    // MyExerciseService.kt
+
+    private fun requestLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // --- MODIFICATION ---
+            // Build a more demanding and explicit LocationRequest
+            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 500)
+                .setWaitForAccurateLocation(true) // Crucial: Don't settle for a quick, inaccurate fix.
+                .setMinUpdateIntervalMillis(500) // Request updates at least every second.
+                .setMaxUpdateDelayMillis(500) // Allow slight batching to save power, but not too much.
+                .build()
+
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    /*override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         Log.d("MyExerciseService", "Service Started (onStartCommand())")
         startForeground(1, createNotification())
@@ -156,7 +212,33 @@ class MyExerciseService : LifecycleService() {
             exerciseStarted = true
         }
         return START_STICKY // Corrected line
+    }*/
+    // MyExerciseService.kt
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
+        Log.d(TAG, "Service Started (onStartCommand())")
+
+        // For Android 14 (API 34) and above, you must specify the type.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                1,
+                createNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(1, createNotification())
+        }
+
+        if (!exerciseStarted) {
+            Log.d(TAG, "Starting exercise...")
+            startExercise()
+            requestLocationUpdates()
+            exerciseStarted = true
+        }
+        return START_STICKY
     }
+
 
     private fun startExercise() {
         Log.d("MyExerciseService", "Starting exercise... (startExercise())")

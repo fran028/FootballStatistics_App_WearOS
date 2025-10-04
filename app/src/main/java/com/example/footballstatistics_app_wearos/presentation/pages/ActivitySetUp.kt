@@ -23,8 +23,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.presentation.ActivitySetUpViewModel
 import com.example.footballstatistics_app_wearos.presentation.black
+import com.example.footballstatistics_app_wearos.presentation.presentation.ActivitySetUpViewModel
+// Corrected import paths
 import com.example.footballstatistics_app_wearos.presentation.blue
 import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
 import com.example.footballstatistics_app_wearos.presentation.components.LoadingScreen
@@ -39,9 +40,7 @@ import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.compose.layout.ScalingLazyColumn
 import com.google.android.horologist.compose.layout.ScalingLazyColumnDefaults
 import com.google.android.horologist.compose.layout.rememberResponsiveColumnState
-import com.google.android.horologist.compose.material.Chip
 import kotlinx.coroutines.launch
-import org.w3c.dom.Text
 import java.util.Date
 
 @OptIn(ExperimentalHorologistApi::class)
@@ -53,8 +52,10 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
     val database = AppDatabase.getDatabase(context)
     val viewModel: ActivitySetUpViewModel = viewModel(factory = ActivitySetUpViewModelFactory(database))
 
-    var startMatchButton by remember { mutableStateOf(false) }
-    val (currentLocation, hasLocationPermission) = rememberLocationState(context)
+    // This returns a Pair<State<Boolean>, MutableState<Location?>>
+    val (hasLocationPermission, locationState) = rememberLocationState(context)
+    // Use the `by` delegate to automatically unwrap the .value
+    val currentLocation by locationState
 
     val columnState = rememberResponsiveColumnState(
         contentPadding = ScalingLazyColumnDefaults.padding(
@@ -91,11 +92,13 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                 ChipButton(
                     text = "Start Match",
                     onClick = {
+                        // FIX: Check if the unwrapped value is not null
                         if (currentLocation != null) {
                             scope.launch {
                                 val currentMatch = database.matchDao().getMatchById(viewModel.matchId)
                                 if (currentMatch != null) {
-                                    currentMatch.start_location = "${currentLocation.latitude},${currentLocation.longitude}"
+                                    // FIX: Access properties on the unwrapped `currentLocation` object
+                                    currentMatch.start_location = "${currentLocation!!.latitude},${currentLocation!!.longitude}"
                                     currentMatch.iniTime = Date().toString()
                                     database.matchDao().updateMatch(currentMatch)
                                 }
@@ -161,7 +164,6 @@ fun ActivitySetUpPage(modifier: Modifier = Modifier, navController: NavControlle
                     filled = viewModel.isKickOffLocationSet
                 )
             }
-
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
+import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,14 +31,17 @@ import androidx.navigation.NavController
 import androidx.wear.compose.material.ChipDefaults.chipColors
 import androidx.wear.compose.material.Text
 import com.example.footballstatistics_app_wearos.R
-import com.example.footballstatistics_app_wearos.presentation.presentation.StopWatchViewModel
+import com.example.footballstatistics_app_wearos.presentation.MyExerciseService
 import com.example.footballstatistics_app_wearos.presentation.TimerState
+import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
+import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
+import com.example.footballstatistics_app_wearos.presentation.presentation.StopWatchViewModel
+import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
+import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.black
 import com.example.footballstatistics_app_wearos.presentation.blue
-import com.example.footballstatistics_app_wearos.presentation.components.ChipButton
 import com.example.footballstatistics_app_wearos.presentation.green
 import com.example.footballstatistics_app_wearos.presentation.red
-import com.example.footballstatistics_app_wearos.presentation.theme.LeagueGothic
 import com.example.footballstatistics_app_wearos.presentation.white
 import com.example.footballstatistics_app_wearos.presentation.yellow
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
@@ -49,11 +54,6 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import android.content.Intent
-import android.util.Log
-import com.example.footballstatistics_app_wearos.presentation.MyExerciseService
-import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
-import com.example.footballstatistics_app_wearos.presentation.rememberLocationState
 
 @OptIn(ExperimentalHorologistApi::class)
 @Composable
@@ -72,16 +72,25 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
 
     var isThereAnyMatch by remember { mutableStateOf(false) }
     var matchId by remember { mutableStateOf(0) }
-    val (currentLocation, hasLocationPermission) = rememberLocationState(context)
+
+    // --- FIX START ---
+    // Destructure the Pair returned by rememberLocationState
+    val (hasLocationPermission, locationState) = rememberLocationState(context)
+    // Use the `by` delegate to automatically unwrap the .value of the state
+    val currentLocation by locationState
+    // --- FIX END ---
+
     var isServiceRunning by remember { mutableStateOf(false) }
     var iniTime: LocalTime by remember { mutableStateOf(LocalTime.MIN) }
     var formatedInitime by remember { mutableStateOf("") }
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
-            isThereAnyMatch = database.matchDao().isThereAnyMatch()
-            if (isThereAnyMatch) {
-                matchId = database.matchDao().getMatchId()
+            database.matchDao().isThereAnyMatch()?.let {
+                isThereAnyMatch = it
+                if (isThereAnyMatch) {
+                    matchId = database.matchDao().getMatchId()
+                }
             }
         }
     }
@@ -262,8 +271,11 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
 
                                 scope.launch {
                                     val currentMatch = database.matchDao().getMatchById(matchId)
-                                    val currentCoordinates = "${currentLocation?.latitude}, ${currentLocation?.longitude}"
-                                    if (currentMatch != null) {
+                                    // FIX: Check if currentLocation (the unwrapped Location? object) is not null before using it.
+                                    if (currentLocation != null && currentMatch != null) {
+                                        // Now it's safe to access latitude and longitude.
+                                        val currentCoordinates = "${currentLocation!!.latitude},${currentLocation!!.longitude}"
+
                                         currentMatch.date = formattedDate
                                         currentMatch.total_time = stopWatchText
                                         currentMatch.iniTime = formatedInitime
