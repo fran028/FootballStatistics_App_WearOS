@@ -4,8 +4,6 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -13,13 +11,15 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LifecycleService
 import com.example.footballstatistics_app_wearos.R
 import com.example.footballstatistics_app_wearos.presentation.data.AppDatabase
 import com.example.footballstatistics_app_wearos.presentation.presentation.TransferEvent
 import com.example.footballstatistics_app_wearos.presentation.presentation.TransferState
 import com.example.footballstatistics_app_wearos.presentation.presentation.UploadViewModel
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.NodeClient
+import com.google.android.gms.wearable.DataItem
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.gson.Gson
@@ -28,70 +28,92 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
-class TransferDataService : Service() {
+class TransferDataService : LifecycleService() {
+    private val TAG = "TransferDataService"
     private val CHANNEL_ID = "TransferDataServiceChannel"
     private val NOTIFICATION_ID = 1001
-    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var dataClient: DataClient
     private lateinit var database: AppDatabase
     private lateinit var viewModel: UploadViewModel
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
+    override fun onBind(intent: Intent): IBinder {
+        super.onBind(intent)
+        // onBind is required for LifecycleService, but we don't need a binder for this service.
+        throw UnsupportedOperationException("Not yet implemented")
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("TransferDataService", "Service created")
+        Log.d(TAG, "Service created")
         dataClient = Wearable.getDataClient(this)
         val container = (application as FootballStatisticsApplication).container
         database = container.database
         viewModel = container.uploadViewModel
-
-        val nodeClient: NodeClient = Wearable.getNodeClient(this)
-        isPhoneConnected(nodeClient) { isConnected ->
-            if (isConnected) {
-                Log.d("TransferDataService", "Phone is connected")
-            } else {
-                Log.d("TransferDataService", "Phone is not connected")
-            }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("TransferDataService", "Service started")
+        super.onStartCommand(intent, flags, startId)
+        Log.d(TAG, "Service started")
         viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS, 0))
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            if (checkSelfPermission(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE) == PackageManager.PERMISSION_GRANTED) {
-                createNotificationChannel()
-                val notification = createNotification()
+        // --- SOLUTION: Call startForeground() IMMEDIATELY ---
+        createNotificationChannel()
+        val notification = createNotification("Preparing to transfer...")
 
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-                )
-            } else {
-                stopSelf()
-                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         } else {
-            createNotificationChannel()
-            val notification = createNotification()
             startForeground(NOTIFICATION_ID, notification)
         }
-        coroutineScope.launch {
-            try {
-                sendDataToPhone()
-                if (viewModel.getTransferState() == TransferState.COMPLETED) {
-                    Log.d("TransferDataService", "COMPLETED")
-                    stopSelf()
-                }
-            } catch (e: Exception) {
+        // --- The 5-second rule is now satisfied ---
+
+
+        // --- Now, check for permissions ---
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                Log.e(TAG, "POST_NOTIFICATIONS permission not granted. Stopping.")
                 viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
-                Log.e("TransferDataService", "Error sending data FAILED", e)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (checkSelfPermission(Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED) {
+                Log.e(TAG, "Foreground service permission not granted. Stopping.")
+                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+
+        // --- Start Data Transfer Coroutine ---
+        serviceScope.launch {
+            try {
+                // 1. Verify connection first
+                val isConnected = isPhoneConnected()
+                if (!isConnected) {
+                    throw IllegalStateException("Phone is not connected.")
+                }
+
+                // 2. Perform the data transfer and wait for it to complete
+                sendMatchData()
+
+                // 3. Send final completion signal to phone
+                sendTransferCompleteSignal()
+
+                // 4. Update UI to COMPLETED and stop service
+                viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED, 100))
+                Log.d(TAG, "Data transfer process completed successfully.")
+                stopSelf()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during data transfer", e)
+                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
                 stopSelf()
             }
         }
@@ -99,120 +121,99 @@ class TransferDataService : Service() {
         return START_STICKY
     }
 
-    private suspend fun sendDataToPhone() {
-        Log.d("TransferDataService", "Sending data to phone")
-        val matches = database.matchDao().getAllMatches()
-        val locationData = database.locationDataDao().getAllLocationData()
+    private suspend fun sendMatchData() {
+        Log.d(TAG, "Fetching match data from database.")
 
-        val chunkSize = 10
-        val matchChunks = matches.chunked(chunkSize)
-        val locationDataChunks = locationData.chunked(chunkSize)
-
-        val totalMatchChunks = matchChunks.size
-        val totalLocationChunks = locationDataChunks.size
-        val totalChunks = totalMatchChunks + totalLocationChunks + 2
-
-        var chunksSent = 0
-        var locationChunksSent = 0
-        var matchChunksSent = 0
-
-        val gson = Gson()
-        //send start
-        sendChunk(gson.toJson(TransferData("start","")), "/transfer_data")
-        chunksSent++
-        viewModel.sendTransferEvent(
-            TransferEvent(
-                TransferState.IN_PROGRESS,
-                (chunksSent * 100) / totalChunks
-            )
-        )
-        for (chunk in matchChunks) {
-            val matchesJson = gson.toJson(TransferData("matches", chunk))
-            sendChunk(matchesJson, "/match_data")
-            chunksSent++
-            matchChunksSent++
-            Log.d("TransferDataService", "Match Chunks sent: $matchChunksSent / $totalMatchChunks")
-            viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks))
+        // Fetch the single match to be transferred.
+        val matchToTransfer = database.matchDao().getMatch()
+        if (matchToTransfer == null) {
+            Log.w(TAG, "No match found in the database to transfer.")
+            // Consider this a success if there's nothing to send.
+            return
         }
 
-        for (chunk in locationDataChunks) {
-            val locationDataJson = gson.toJson(TransferData("location_data", chunk))
-            sendChunk(locationDataJson, "/location_data")
-            chunksSent++
-            locationChunksSent++
-            Log.d("TransferDataService", "Location Chunks sent: $locationChunksSent / $totalLocationChunks")
-            viewModel.sendTransferEvent( TransferEvent( TransferState.IN_PROGRESS, (chunksSent * 100) / totalChunks ))
-        }
-        //send end
-            sendChunk(gson.toJson(TransferData("end","")), "/transfer_data")
-        chunksSent++
-        viewModel.sendTransferEvent(TransferEvent(TransferState.COMPLETED,(chunksSent * 100) / totalChunks))
-        Log.d("TransferDataService", "Data sent to phone")
+        val locationData = database.locationDataDao().getLocationsForMatch(matchToTransfer.id)
+        Log.d(TAG, "Found match ${matchToTransfer.id} with ${locationData.size} location points.")
+
+        // --- Send Match Data ---
+        updateNotification("Sending match details...")
+        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS, 25))
+        val matchJson = Gson().toJson(matchToTransfer)
+        val matchDataMap = PutDataMapRequest.create("/match_data")
+        matchDataMap.dataMap.putString("match_data", matchJson)
+        sendData(matchDataMap).await()
+        Log.d(TAG, "Match data sent successfully.")
+
+        // --- Send Location Data ---
+        updateNotification("Sending location data...")
+        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS, 50))
+        // Convert location objects to a simpler String format for efficiency
+        val locationStrings = locationData.map { "${it.latitude},${it.longitude},${it.timestamp}" }
+        val locationDataMap = PutDataMapRequest.create("/location_data")
+        locationDataMap.dataMap.putStringArrayList("location_data", ArrayList(locationStrings))
+        sendData(locationDataMap).await()
+        Log.d(TAG, "Location data sent successfully.")
     }
 
-    private suspend fun sendChunk(json: String, path: String) {
-        Log.d("TransferDataService", "Sending chunk to phone $path")
-        val request = PutDataMapRequest.create(path).apply {
-            dataMap.putString("data", json)
-            dataMap.putLong("Time", System.currentTimeMillis())
-        }.asPutDataRequest()
-        Log.d("TransferDataService", "Request created $request")
-        dataClient.putDataItem(request)
-            .addOnSuccessListener {
-                Log.d("TransferDataService", "Chunk sent to phone successfully!")
-                // Possibly update UI or app state to reflect successful send
-            }
-            .addOnFailureListener { e ->
-                viewModel.sendTransferEvent(TransferEvent(TransferState.FAILED, 0))
-                Log.e("TransferDataService", "Error sending data: ${e.message}", e)
-            }
+    private suspend fun sendTransferCompleteSignal() {
+        Log.d(TAG, "Sending transfer complete signal.")
+        updateNotification("Finishing transfer...")
+        viewModel.sendTransferEvent(TransferEvent(TransferState.IN_PROGRESS, 95))
+        val completionRequest = PutDataMapRequest.create("/transfer_complete")
+        sendData(completionRequest).await()
     }
-    data class TransferData(val type: String, val data: Any)
+
+    // A suspend function that wraps the async DataClient call
+    private fun sendData(dataMapRequest: PutDataMapRequest): Task<DataItem> {
+        val request = dataMapRequest.setUrgent().asPutDataRequest()
+        return dataClient.putDataItem(request)
+    }
+
+    private suspend fun isPhoneConnected(): Boolean {
+        return try {
+            val connectedNodes = withTimeoutOrNull(5000) { // 5-second timeout
+                Wearable.getNodeClient(this@TransferDataService).connectedNodes.await()
+            }
+            if (connectedNodes.isNullOrEmpty()) {
+                Log.w(TAG, "No connected nodes found.")
+                return false
+            }
+            Log.d(TAG, "Phone is connected: ${connectedNodes.first().displayName}")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check for connected phone.", e)
+            false
+        }
+    }
+
+    private fun updateNotification(contentText: String) {
+        val notification = createNotification(contentText)
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification)
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
-                "Transfer Data Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
+                "Transfer Data Service",
+                NotificationManager.IMPORTANCE_LOW
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(serviceChannel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(serviceChannel)
         }
     }
 
-    private fun createNotification(): Notification {
-        val notificationIntent = Intent(this, TransferDataService::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
+    private fun createNotification(contentText: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Transfer Data Service")
-            .setContentText("Transferring data...")
-            .setSmallIcon(R.mipmap.logoapp)
-            .setContentIntent(pendingIntent)
+            .setContentTitle("Data Transfer")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_upload) // Using a standard system icon
+            .setOngoing(true)
             .build()
     }
 
-    fun isPhoneConnected(nodeClient: NodeClient, onConnectionResult: (Boolean) -> Unit) {
-        nodeClient.connectedNodes.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                onConnectionResult(task.result.isNotEmpty())
-            } else {
-                // Handle error (e.g., log it)
-                onConnectionResult(false)
-            }
-        }
-    }
-
-
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("TransferDataService", "Service destroyed")
-        coroutineScope.cancel()
+        Log.d(TAG, "Service destroyed")
+        serviceScope.cancel()
     }
 }

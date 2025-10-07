@@ -1,5 +1,6 @@
 package com.example.footballstatistics_app_wearos.presentation.data
 
+import android.service.autofill.FieldClassification
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -25,6 +26,12 @@ interface MatchDao {
 
     @Query("DELETE FROM matches")
     suspend fun deleteAllMatches()
+
+    // In your MatchDao.kt interface
+
+    @Query("SELECT * FROM matches LIMIT 1")
+    suspend fun getMatch(): MatchEntity? // The '?' is important in case the table is empty
+
 
     suspend fun isThereAnyMatch(): Boolean {
         val matches = getAllMatches()

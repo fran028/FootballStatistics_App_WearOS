@@ -28,5 +28,8 @@ interface LocationDataDao {
     @Query("SELECT * FROM location_data ORDER BY id ASC LIMIT 1")
     suspend fun getFirstLocationData(): LocationDataEntity?
 
+    @Query("SELECT * FROM location_data WHERE match_id = :matchId")
+    suspend fun getLocationsForMatch(matchId: Int): List<LocationDataEntity>
+
 
 }

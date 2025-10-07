@@ -12,7 +12,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.footballstatisticsapp.wearable"
+        applicationId = "com.example.footballstatisticsapp.wear"
         minSdk = 30
         targetSdk = 34
         versionCode = 1
@@ -108,6 +108,9 @@ dependencies {
 
     implementation("io.insert-koin:koin-android:3.5.3")
     implementation("io.insert-koin:koin-androidx-compose:3.5.3")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.0")
+
 
 
 }

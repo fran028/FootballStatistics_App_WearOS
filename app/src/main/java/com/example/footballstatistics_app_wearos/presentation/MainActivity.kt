@@ -1,6 +1,7 @@
 package com.example.footballstatistics_app_wearos.presentation
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -41,6 +42,9 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setTheme(android.R.style.Theme_DeviceDefault)
+
+        val serviceIntent = Intent(this, CapabilityService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
 
         requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()

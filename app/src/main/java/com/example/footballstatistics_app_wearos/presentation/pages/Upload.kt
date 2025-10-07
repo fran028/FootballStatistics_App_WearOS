@@ -50,79 +50,79 @@ fun UploadPage(
     navController: NavController,
     listState: ScalingLazyListState = rememberScalingLazyListState()
 ) {
-    Log.d("Upload", "UploadPage")
+    Log.d("Upload", "UploadPage Composed")
     val context = LocalContext.current
     val container = (context.applicationContext as FootballStatisticsApplication).container
     val viewModel: UploadViewModel = container.uploadViewModel
+
     val transferEvent by viewModel.transferEvent.collectAsStateWithLifecycle()
-    val progress = viewModel.getTransferProgress()
-    val transferState = viewModel.getTransferState()
+    val transferState = transferEvent.state
+    val progress = transferEvent.progress
 
-
-    var hasBluetoothConnectPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else Manifest.permission.BLUETOOTH
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var hasBluetoothScanPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.BLUETOOTH
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var hasForegroundServicePermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
+    // --- SOLUTION: Add POST_NOTIFICATIONS to the list of required permissions ---
+    val requiredPermissions = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
+            listOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.FOREGROUND_SERVICE,
+                Manifest.permission.POST_NOTIFICATIONS // Add this permission
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12
+            listOf(
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.FOREGROUND_SERVICE
-            ) == PackageManager.PERMISSION_GRANTED
+            )
+        } else { // Older versions
+            listOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.FOREGROUND_SERVICE
+            )
+        }
+    }
+
+    var hasAllPermissions by remember {
+        mutableStateOf(
+            requiredPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
         )
     }
 
-    val bluetoothConnectPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            hasBluetoothConnectPermission = isGranted
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissionsMap ->
+        hasAllPermissions = permissionsMap.values.all { it }
+        if (hasAllPermissions) {
+            Log.d("Upload", "All required permissions granted.")
+        } else {
+            Log.e("Upload", "Not all permissions were granted. Data transfer may fail.")
         }
-    val bluetoothScanPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            hasBluetoothScanPermission = isGranted
-        }
-    val foregroundServicePermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            hasForegroundServicePermission = isGranted
-        }
+    }
+
+    // This effect runs once to check/request permissions.
     LaunchedEffect(key1 = Unit) {
-        if (!hasBluetoothConnectPermission) {
-            bluetoothConnectPermissionLauncher.launch(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_CONNECT else Manifest.permission.BLUETOOTH)
+        if (!hasAllPermissions) {
+            Log.d("Upload", "Requesting permissions: $requiredPermissions")
+            permissionLauncher.launch(requiredPermissions.toTypedArray())
         }
-        if (!hasBluetoothScanPermission) {
-            bluetoothScanPermissionLauncher.launch(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.BLUETOOTH)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !hasForegroundServicePermission) {
-            foregroundServicePermissionLauncher.launch(Manifest.permission.FOREGROUND_SERVICE)
-        }
-        if (hasBluetoothConnectPermission && hasBluetoothScanPermission) {
+    }
+
+    // This effect starts the service *only if* permissions are granted.
+    LaunchedEffect(key1 = hasAllPermissions) {
+        if (hasAllPermissions && transferState == TransferState.NOT_STARTED) {
+            Log.d("Upload", "Permissions are granted. Starting TransferDataService.")
             val serviceIntent = Intent(context, TransferDataService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Log.d("Upload", "UploadPage, starting service")
                 context.startForegroundService(serviceIntent)
             } else {
-                Log.d("Upload", "UploadPage, starting service")
                 context.startService(serviceIntent)
             }
         }
     }
 
-    LaunchedEffect(viewModel.transferEvent) {
-        viewModel.transferEvent.collect {
-            Log.d("Upload", "UploadPage, event = ${it.state}, progress = ${it.progress}")
-        }
-    }
     ScalingLazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -138,11 +138,11 @@ fun UploadPage(
 
         item {
             Image(
-                painter = painterResource(id = R.drawable.logobig), // Replace with your image resource
+                painter = painterResource(id = R.drawable.logobig),
                 contentDescription = "App Logo",
                 modifier = Modifier
                     .width(30.dp)
-                    .height(30.dp)// Adjust modifier as needed
+                    .height(30.dp)
             )
         }
 
@@ -151,23 +151,28 @@ fun UploadPage(
         }
 
         item {
+            // UI is now fully reactive to changes in transferState and progress
             when (transferState) {
                 TransferState.NOT_STARTED -> {
                     ChipButton(
-                        text = "Transfer Not Started",
+                        text = if (!hasAllPermissions) "Grant Permissions" else "Preparing Transfer...",
                         color = white,
-                        onClick = { },
+                        onClick = {
+                            // If permissions were denied, allow the user to try again
+                            if (!hasAllPermissions) {
+                                permissionLauncher.launch(requiredPermissions.toTypedArray())
+                            }
+                        },
                         navController = navController,
                         icon = R.drawable.uploading
                     )
                 }
-
+                // ... (rest of your UI code remains the same)
                 TransferState.IN_PROGRESS -> {
                     ChipButton(
                         text = "Transfer In Progress: $progress%",
                         color = blue,
-                        onClick = {
-                        },
+                        onClick = {},
                         navController = navController,
                         icon = R.drawable.uploading
                     )
@@ -177,7 +182,7 @@ fun UploadPage(
                     ChipButton(
                         text = "Transfer Complete",
                         color = green,
-                        onClick = {  },
+                        onClick = { },
                         navController = navController,
                         icon = R.drawable.complete
                     )
@@ -188,6 +193,15 @@ fun UploadPage(
                         text = "Transfer Failed",
                         color = red,
                         onClick = {
+                            // Allow user to retry starting the service if it failed
+                            if (hasAllPermissions) {
+                                Log.d("Upload", "Retry: Starting TransferDataService.")
+                                val serviceIntent = Intent(context, TransferDataService::class.java)
+                                context.startService(serviceIntent)
+                            } else {
+                                // Prompt for permissions again if they are the cause of failure
+                                permissionLauncher.launch(requiredPermissions.toTypedArray())
+                            }
                         },
                         navController = navController,
                         icon = R.drawable.uploading
@@ -195,11 +209,11 @@ fun UploadPage(
                 }
             }
         }
-        if(transferState == TransferState.COMPLETED){
+        if (transferState == TransferState.COMPLETED) {
             item {
                 Spacer(modifier = Modifier.height(20.dp))
             }
-            item{
+            item {
                 ChipButton(
                     text = "Back to Menu",
                     color = yellow,
