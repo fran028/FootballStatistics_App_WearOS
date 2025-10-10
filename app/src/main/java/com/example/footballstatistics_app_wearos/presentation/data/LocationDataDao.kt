@@ -10,6 +10,9 @@ interface LocationDataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLocationData(locationData: LocationDataEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(locations: List<LocationDataEntity>)
+
     @Query("SELECT * FROM location_data")
     suspend fun getAllLocationData(): List<LocationDataEntity>
 

@@ -42,10 +42,12 @@ import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// UPDATED: Added a new state for clarity
 enum class GpsStatus {
-    ACQUIRING, // Still waiting for a good signal
-    ACCURATE,  // Signal is good enough
-    UNAVAILABLE // Permission denied or GPS is off
+    ACQUIRING,          // Still waiting for an initial usable signal
+    ACQUIRING_IMPROVING,// Have a usable signal, but trying for a better one
+    ACCURATE,           // Signal is excellent
+    UNAVAILABLE         // Permission denied or GPS is off
 }
 
 @OptIn(ExperimentalHorologistApi::class)
@@ -60,24 +62,24 @@ fun ActivityCalibratePage(modifier: Modifier = Modifier, navController: NavContr
     var isThereAnyMatch by remember { mutableStateOf(false) }
     var matchId by remember { mutableStateOf(0) }
 
-    // permissionGranted is now a State<Boolean>
     val (permissionGranted, locationState) = rememberLocationState(context)
-    var currentLocation by locationState
+    val currentLocation by locationState
     var gpsStatus by remember { mutableStateOf(GpsStatus.UNAVAILABLE) }
 
-    // --- NEW: Add a counter to track the number of received locations ---
-    var receivedLocationCount by remember { mutableStateOf(0) }
+    // NEW: Add state to track the best accuracy found so far and if we have a usable location
+    var bestAccuracy by remember { mutableStateOf(Float.MAX_VALUE) }
+    var hasAcquiredGoodEnoughLocation by remember { mutableStateOf(false) }
 
     // This derived state will automatically update when its dependencies change.
     val isButtonEnabled by remember {
-        // Read the .value of the state inside derivedStateOf
-        derivedStateOf { permissionGranted.value && gpsStatus == GpsStatus.ACCURATE }
+        // Enable the button as soon as we have a "good enough" location
+        derivedStateOf { permissionGranted.value && hasAcquiredGoodEnoughLocation }
     }
     val buttonColor = if (isButtonEnabled) yellow else gray
 
     // This effect manages GPS status based on location updates and permission changes.
     LaunchedEffect(currentLocation, permissionGranted.value) {
-        if (!permissionGranted.value) { // Read the .value here
+        if (!permissionGranted.value) {
             gpsStatus = GpsStatus.UNAVAILABLE
             return@LaunchedEffect
         }
@@ -88,22 +90,31 @@ fun ActivityCalibratePage(modifier: Modifier = Modifier, navController: NavContr
             return@LaunchedEffect
         }
 
-        // --- IMPROVEMENT: Stricter filtering logic ---
-        receivedLocationCount++ // Increment for each new location
-        val requiredAccuracy = 15.0f // Require accuracy better than 15 meters
+        // --- NEW: PROGRESSIVE ACCURACY LOGIC ---
 
-        // Check if accuracy is good enough
-        if (locationData.hasAccuracy() && locationData.accuracy < requiredAccuracy) {
-            // AND wait for a few readings to ensure the GPS has stabilized
-            if (receivedLocationCount > 3) {
-                gpsStatus = GpsStatus.ACCURATE
-            } else {
-                // We have a good reading, but wait for more to be sure.
-                gpsStatus = GpsStatus.ACQUIRING
-            }
-        } else {
-            // Accuracy is not good enough, keep acquiring.
+        // Update the best accuracy seen so far
+        if (locationData.hasAccuracy() && locationData.accuracy < bestAccuracy) {
+            bestAccuracy = locationData.accuracy
+        }
+
+        // Define our accuracy tiers
+        val excellentAccuracy = 8.0f // Target for a great signal
+        val goodEnoughAccuracy = 20.0f // Acceptable accuracy to enable the button
+
+        // 1. Check if we have achieved an EXCELLENT lock
+        if (bestAccuracy < excellentAccuracy) {
+            gpsStatus = GpsStatus.ACCURATE
+            hasAcquiredGoodEnoughLocation = true // An excellent lock is also good enough
+        }
+        // 2. Else, check if we have at least a GOOD ENOUGH lock
+        else if (bestAccuracy < goodEnoughAccuracy) {
+            gpsStatus = GpsStatus.ACQUIRING_IMPROVING
+            hasAcquiredGoodEnoughLocation = true
+        }
+        // 3. Otherwise, we are still waiting for any usable signal
+        else {
             gpsStatus = GpsStatus.ACQUIRING
+            hasAcquiredGoodEnoughLocation = false
         }
     }
 
@@ -145,17 +156,25 @@ fun ActivityCalibratePage(modifier: Modifier = Modifier, navController: NavContr
             )
         }
         item {
-            // --- IMPROVEMENT: Display more detailed GPS status to the user ---
+            // --- IMPROVEMENT: Display more detailed and encouraging GPS status ---
             when (gpsStatus) {
                 GpsStatus.ACQUIRING -> Text(
-                    text = "Improving GPS accuracy...\nTarget: <15m, Current: ${currentLocation?.accuracy?.toInt() ?: "N/A"}m",
+                    text = "Acquiring GPS Signal...\nTarget: <20m",
                     fontFamily = LeagueGothic,
                     fontSize = 14.sp,
                     color = white,
                     textAlign = TextAlign.Center
                 )
+                GpsStatus.ACQUIRING_IMPROVING -> Text(
+                    // The button is enabled, but we let the user know it can get better
+                    text = "Location Ready. Improving...\nAccuracy: ${bestAccuracy.toInt()}m",
+                    fontFamily = LeagueGothic,
+                    fontSize = 14.sp,
+                    color = yellow, // Use yellow to indicate "good but not perfect"
+                    textAlign = TextAlign.Center
+                )
                 GpsStatus.ACCURATE -> Text(
-                    text = "GPS Signal Locked!\nAccuracy: ${currentLocation?.accuracy?.toInt() ?: "N/A"}m",
+                    text = "GPS Signal Locked!\nAccuracy: ${bestAccuracy.toInt()}m",
                     fontFamily = LeagueGothic,
                     fontSize = 14.sp,
                     color = green,

@@ -43,8 +43,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setTheme(android.R.style.Theme_DeviceDefault)
 
-        val serviceIntent = Intent(this, CapabilityService::class.java)
-        ContextCompat.startForegroundService(this, serviceIntent)
+        /*val serviceIntent = Intent(this, CapabilityService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)*/
 
         requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()

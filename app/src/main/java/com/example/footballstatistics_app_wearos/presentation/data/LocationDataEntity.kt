@@ -12,5 +12,7 @@ data class LocationDataEntity(
     @ColumnInfo(name = "match_id") val matchId: Int,
     @ColumnInfo(name = "latitude") val latitude: Double,
     @ColumnInfo(name = "longitude") val longitude: Double,
-    @ColumnInfo(name = "timestamp") val timestamp: Long
+    @ColumnInfo(name = "timestamp") val timestamp: Long,
+    @ColumnInfo(name = "accuracy") val accuracy: Float? = null,
+
 )
