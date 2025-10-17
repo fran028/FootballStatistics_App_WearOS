@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.protobuf.javalite)
 
     implementation(libs.play.services.location)
+
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
 

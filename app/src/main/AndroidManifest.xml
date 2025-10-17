@@ -62,7 +62,7 @@
         <!-- Services -->
         <service
             android:name=".presentation.MyExerciseService"
-            android:foregroundServiceType="location|health"
+            android:foregroundServiceType="health"
             android:enabled="true"
             android:exported="false" />
 

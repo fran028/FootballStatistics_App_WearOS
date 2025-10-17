@@ -1,6 +1,10 @@
 package com.example.footballstatistics_app_wearos.presentation.pages
 
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,12 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -73,16 +73,66 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
     var isThereAnyMatch by remember { mutableStateOf(false) }
     var matchId by remember { mutableStateOf(0) }
 
-    // --- FIX START ---
-    // Destructure the Pair returned by rememberLocationState
     val (hasLocationPermission, locationState) = rememberLocationState(context)
-    // Use the `by` delegate to automatically unwrap the .value of the state
     val currentLocation by locationState
-    // --- FIX END ---
 
-    var isServiceRunning by remember { mutableStateOf(false) }
-    var iniTime: LocalTime by remember { mutableStateOf(LocalTime.MIN) }
-    var formatedInitime by remember { mutableStateOf("") }
+    var showDialog by remember { mutableStateOf(false) }
+
+    val today: LocalDate = LocalDate.now()
+    val formatterDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    val formattedDate: String = today.format(formatterDate)
+
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    // --- FIX: Change startTime to a var ---
+    var startTime by remember { mutableStateOf("") }
+
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    // This LaunchedEffect is for the live clock display
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(10000)
+            currentTime = LocalTime.now()
+        }
+    }
+    val formattedTime = currentTime.format(timeFormatter)
+
+    val viewModel = viewModel<StopWatchViewModel>()
+    val timerState by viewModel.timerState.collectAsStateWithLifecycle()
+    val stopWatchText by viewModel.stopWatchText.collectAsStateWithLifecycle()
+
+    // --- FIX: Capture the startTime when the ViewModel is ready ---
+    LaunchedEffect(key1 = viewModel) {
+        startTime = LocalTime.now().format(timeFormatter)
+    }
+
+    // --- SERVICE MANAGEMENT LOGIC ---
+    var exerciseService by remember { mutableStateOf<MyExerciseService?>(null) }
+    val connection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                exerciseService = (service as MyExerciseService.LocalBinder).getService()
+                Log.d("ActivityTrackerPage", "Service connected")
+            }
+            override fun onServiceDisconnected(name: ComponentName?) {
+                exerciseService = null
+                Log.d("ActivityTrackerPage", "Service disconnected")
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        Intent(context, MyExerciseService::class.java).also { intent ->
+            context.startForegroundService(intent)
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            Log.d("ActivityTrackerPage", "Service bound")
+        }
+        onDispose {
+            context.unbindService(connection)
+            Log.d("ActivityTrackerPage", "Service unbound")
+        }
+    }
+    // --- END OF SERVICE MANAGEMENT LOGIC ---
 
     LaunchedEffect(key1 = Unit) {
         scope.launch {
@@ -94,45 +144,6 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
             }
         }
     }
-
-    LaunchedEffect(key1 = true) {
-        if (!isServiceRunning) {
-            val startIntent = Intent(context, MyExerciseService::class.java)
-            context.startForegroundService(startIntent)
-            isServiceRunning = true
-            Log.d("ActivityTrackerPage", "Service Executed")
-        }
-        iniTime = LocalTime.now()
-        val formatter = DateTimeFormatter.ofPattern("HH:mm")
-        formatedInitime = iniTime.format(formatter)
-
-    }
-
-
-    var showDialog by remember { mutableStateOf(false) }
-
-
-    val today: LocalDate = LocalDate.now()
-    val formatterDate = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-    val formattedDate: String = today.format(formatterDate)
-
-    var currentTime by remember { mutableStateOf(LocalTime.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(10000)
-            currentTime = LocalTime.now()
-        }
-    }
-
-    // Format the time
-    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-    val formattedTime = currentTime.format(formatter)
-
-
-    val viewModel = viewModel<StopWatchViewModel>()
-    val timerState by viewModel.timerState.collectAsStateWithLifecycle()
-    val stopWatchText by viewModel.stopWatchText.collectAsStateWithLifecycle()
-
 
     ScalingLazyColumn(modifier = Modifier
         .fillMaxSize()
@@ -155,77 +166,41 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
             )
         }
         item {
-            //Chip("Stop", onClick = {navController.navigate("Activity_Result")})
             Row(modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly) {
 
                 Chip(
-                    label = {
-                        Text(
-                            text = "",
-                            fontFamily = LeagueGothic,
-                            fontSize = 16.sp
-                        )
-                    },
-                    onClick = {
-                        val intent = Intent(context, MyExerciseService::class.java)
-                        Log.d("ActivityTrackerPage", "Stop button clicked")
-                        intent.action = MyExerciseService.ACTION_PAUSE
-                        context.startService(intent)
-                        showDialog = true
-                    },
+                    label = { Text(text = "", fontFamily = LeagueGothic, fontSize = 16.sp) },
+                    onClick = { showDialog = true },
                     colors = chipColors(backgroundColor = red, contentColor = black),
                     shape = RoundedCornerShape(25.dp),
                     modifier = Modifier
                         .width(50.dp)
                         .padding(bottom = 8.dp),
-                    icon = {
-                        Image(
-                            painter = painterResource(id = R.drawable.stop),
-                            contentDescription = "Stop Icon",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    icon = { Image(painter = painterResource(id = R.drawable.stop), contentDescription = "Stop Icon", modifier = Modifier.size(24.dp)) }
                 )
                 if (timerState != TimerState.PAUSED) {
                     Chip(
-                        label = {
-                            Text(
-                                text = "",
-                                fontFamily = LeagueGothic,
-                                fontSize = 16.sp
-                            )
-                        },
+                        label = { Text(text = "", fontFamily = LeagueGothic, fontSize = 16.sp) },
                         onClick = {
                             viewModel.toggleIsRunning()
                             val intent = Intent(context, MyExerciseService::class.java)
                             Log.d("ActivityTrackerPage", "Pause button clicked")
                             intent.action = MyExerciseService.ACTION_PAUSE
-                            context.startForegroundService(intent) },
+                            context.startService(intent)
+                        },
                         colors = chipColors(backgroundColor = blue, contentColor = black),
                         shape = RoundedCornerShape(25.dp),
                         modifier = Modifier
                             .width(50.dp)
                             .padding(bottom = 8.dp),
-                        icon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.pause),
-                                contentDescription = "Pause Icon",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        icon = { Image(painter = painterResource(id = R.drawable.pause), contentDescription = "Pause Icon", modifier = Modifier.size(24.dp)) }
                     )
                 } else {
                     Chip(
-                        label = {
-                            Text(
-                                text = "",
-                                fontFamily = LeagueGothic,
-                                fontSize = 16.sp
-                            )
-                        },
+                        label = { Text(text = "", fontFamily = LeagueGothic, fontSize = 16.sp) },
                         onClick = {
                             viewModel.toggleIsRunning()
                             val intent = Intent(context, MyExerciseService::class.java)
@@ -238,13 +213,7 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         modifier = Modifier
                             .width(50.dp)
                             .padding(bottom = 8.dp),
-                        icon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.play),
-                                contentDescription = "Play Icon",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        icon = { Image(painter = painterResource(id = R.drawable.play), contentDescription = "Play Icon", modifier = Modifier.size(24.dp)) }
                     )
                 }
             }
@@ -265,54 +234,49 @@ fun ActivityTrackerPage(modifier: Modifier = Modifier, navController: NavControl
                         ChipButton(
                             text = "End Match",
                             onClick = {
-                                Log.d("ActivityTrackerPage", "End button clicked")
-                                val serviceIntent = Intent(context, MyExerciseService::class.java)
-                                context.stopService(serviceIntent)
-
+                                Log.d("ActivityTrackerPage", "End button clicked from dialog")
                                 scope.launch {
+                                    // --- FIX: Save data BEFORE you navigate ---
+
                                     val currentMatch = database.matchDao().getMatchById(matchId)
-                                    // FIX: Check if currentLocation (the unwrapped Location? object) is not null before using it.
-                                    if (currentLocation != null && currentMatch != null) {
-                                        // Now it's safe to access latitude and longitude.
-                                        val currentCoordinates = "${currentLocation!!.latitude},${currentLocation!!.longitude}"
+                                    if (currentMatch != null) {
+                                        // --- NEW: Capture end time and update all fields ---
+                                        val endTime = LocalTime.now().format(timeFormatter)
 
                                         currentMatch.date = formattedDate
                                         currentMatch.total_time = stopWatchText
-                                        currentMatch.iniTime = formatedInitime
-                                        currentMatch.endTime = formattedTime
-                                        currentMatch.end_location = currentCoordinates
+                                        currentMatch.iniTime = startTime
+                                        currentMatch.endTime = endTime
 
-                                        database.matchDao().updateMatch(currentMatch)
+                                        Log.d("ActivityTrackerPage", "Saving match data for match ID: $matchId...")
+                                        database.matchDao().updateMatch(currentMatch) // Assuming your update function is named `update`
+                                        Log.d("ActivityTrackerPage", "Match data saved.")
+                                    } else {
+                                        Log.e("ActivityTrackerPage", "Could not find match with ID $matchId to save.")
                                     }
+
+                                    exerciseService?.stopExercise()
+                                    navController.navigate("Activity_Result")
                                 }
-                                viewModel.resetTimer()
-                                navController.navigate("Result")
-                                showDialog = false
                             },
                             color = red,
                             icon = R.drawable.stop,
+                            filled = false,
                             navController = navController
                         )
                     }
                     item {
-                        Spacer(modifier = Modifier.size(8.dp))
-                    }
-                    item {
+                        Spacer(Modifier.size(8.dp))
                         ChipButton(
-                            text = "Continue Match",
-                            onClick = {
-                                val intent = Intent(context, MyExerciseService::class.java)
-                                intent.action = MyExerciseService.ACTION_RESUME
-                                context.startService(intent)
-                                showDialog = false
-                            },
+                            text = "Cancel",
+                            onClick = { showDialog = false },
                             color = blue,
                             icon = R.drawable.play,
+                            filled = false,
                             navController = navController
                         )
                     }
                 }
-
             }
         )
     }
